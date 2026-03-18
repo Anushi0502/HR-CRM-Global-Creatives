@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { AppMobileNav } from "../components/AppMobileNav";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppTopbar } from "../components/AppTopbar";
+import { QuickLinksFooter } from "../components/QuickLinksFooter";
 import type { NavItem } from "../types/navigation";
 
 interface AppLayoutProps {
@@ -20,6 +21,7 @@ export function AppLayout({ onSignOut, items, workspaceLabel }: AppLayoutProps) 
           <main className="px-4 py-5 pb-24 md:px-6 md:py-6 lg:px-8 lg:pb-8">
             <div className="mx-auto w-full max-w-[1440px]">
               <Outlet />
+              <QuickLinksFooter items={items} />
             </div>
           </main>
         </div>

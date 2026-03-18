@@ -52,6 +52,10 @@ const employeeNavItems: NavItem[] = [
   { label: "Tasks", path: "/employee/tasks", icon: ClipboardList },
   { label: "My Payroll", path: "/employee/payroll", icon: Wallet },
   { label: "My Profile", path: "/employee/profile", icon: User },
+  { label: "Attendance", path: "/employee/attendance", icon: UserCheck, footerOnly: true },
+  { label: "Leave", path: "/employee/leave", icon: CalendarClock, footerOnly: true },
+  { label: "Payroll", path: "/employee/payroll", icon: Wallet, footerOnly: true },
+  { label: "Profile", path: "/employee/profile", icon: User, footerOnly: true },
 ];
 
 function resolveLandingPath(role: UserRole | null): string {

@@ -4,4 +4,5 @@ export interface NavItem {
   label: string;
   path: string;
   icon: LucideIcon;
+  footerOnly?: boolean;
 }

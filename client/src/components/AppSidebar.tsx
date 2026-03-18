@@ -9,6 +9,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
+  const navItems = items.filter((item) => !item.footerOnly);
   return (
     <aside className="hidden w-[240px] shrink-0 border-r border-slate-200 bg-white/95 lg:flex lg:flex-col">
       <div className="border-b border-slate-200 px-5 py-5">
@@ -25,7 +26,7 @@ export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
 
       <div className="px-4 py-4">
         <nav className="mt-3 space-y-1">
-          {items.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}

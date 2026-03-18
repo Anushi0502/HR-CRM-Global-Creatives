@@ -44,7 +44,7 @@ export function AuthCallbackPage() {
   }, [navigate]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-brand-50 px-4">
+    <div className="flex min-h-screen items-center justify-center px-4">
       <div className="rounded-xl border border-brand-200 bg-white px-6 py-4 text-sm font-semibold text-brand-700">
         {message}
       </div>

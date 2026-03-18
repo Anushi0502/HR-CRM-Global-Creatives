@@ -144,12 +144,7 @@ export function LoginPage({
   };
 
   return (
-    <div className="relative flex min-h-screen animate-page-enter items-center justify-center overflow-hidden bg-[#1a2a69] px-4 py-8 sm:px-6 lg:px-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_26%),radial-gradient(circle_at_88%_18%,rgba(59,130,246,0.22),transparent_22%),linear-gradient(180deg,#1a2a69_0%,#20357a_45%,#3b82f6_100%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.04)_48%,transparent_56%)]" />
-      <div className="absolute -left-12 top-8 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-      <div className="absolute bottom-6 right-8 h-72 w-72 rounded-full bg-brand-200/18 blur-3xl" />
-
+    <div className="relative flex min-h-screen animate-page-enter items-center justify-center overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
       <div className="relative grid w-full max-w-7xl overflow-hidden rounded-[36px] border border-white/16 bg-white/[0.05] shadow-[0_40px_120px_-60px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:grid-cols-[1.08fr_0.92fr]">
         <section className="relative hidden overflow-hidden px-8 py-10 text-white lg:block xl:px-10">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_30%)]" />

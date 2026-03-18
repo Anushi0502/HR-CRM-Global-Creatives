@@ -7,10 +7,11 @@ interface AppMobileNavProps {
 }
 
 export function AppMobileNav({ items }: AppMobileNavProps) {
+  const navItems = items.filter((item) => !item.footerOnly);
   return (
     <nav className="fixed inset-x-3 bottom-3 z-40 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg lg:hidden">
       <ul className="flex gap-1 overflow-x-auto">
-        {items.map((item) => (
+        {navItems.map((item) => (
           <li key={item.path} className="min-w-[80px] flex-1">
             <NavLink
               to={item.path}
