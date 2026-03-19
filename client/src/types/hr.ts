@@ -5,6 +5,7 @@ export type CandidateStage = "sourced" | "interview" | "offer" | "hired" | "reje
 export type PayrollStatus = "processed" | "scheduled";
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
 export type TaskPriority = "low" | "medium" | "high" | "critical";
+export type NotificationRole = "admin" | "employee";
 
 export interface DashboardOverview {
   metrics: {
@@ -102,6 +103,15 @@ export interface Task {
   assigneeName: string | null;
   createdBy: string;
   createdByEmail: string | null;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  role: NotificationRole;
+  title: string;
+  message: string;
+  read: boolean;
   createdAt: string;
 }
 

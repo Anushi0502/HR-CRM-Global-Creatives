@@ -7,6 +7,9 @@ interface AppTopbarProps {
   onSignOut: () => void;
   items: NavItem[];
   workspaceLabel: string;
+  onToggleNotifications?: () => void;
+  unreadNotifications?: number;
+  notificationsOpen?: boolean;
 }
 
 function resolveCurrentTitle(pathname: string, items: NavItem[], fallback: string): string {
@@ -15,7 +18,14 @@ function resolveCurrentTitle(pathname: string, items: NavItem[], fallback: strin
   return match?.label ?? fallback;
 }
 
-export function AppTopbar({ onSignOut, items, workspaceLabel }: AppTopbarProps) {
+export function AppTopbar({
+  onSignOut,
+  items,
+  workspaceLabel,
+  onToggleNotifications,
+  unreadNotifications = 0,
+  notificationsOpen = false,
+}: AppTopbarProps) {
   const location = useLocation();
   const currentTitle = useMemo(
     () => resolveCurrentTitle(location.pathname, items, workspaceLabel),
@@ -30,10 +40,24 @@ export function AppTopbar({ onSignOut, items, workspaceLabel }: AppTopbarProps) 
           <p className="truncate text-base font-semibold text-ink">{workspaceLabel}</p>
           <p className="truncate text-sm text-slate-500">{currentTitle}</p>
         </div>
-        <button type="button" onClick={onSignOut} className="btn-primary px-4 py-2.5">
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onToggleNotifications?.()}
+            className={`btn-secondary px-3 py-2 ${notificationsOpen ? "border-brand-200 bg-brand-50" : ""}`}
+          >
+            Alerts
+            {unreadNotifications > 0 ? (
+              <span className="ml-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[0.65rem] font-semibold text-white">
+                {unreadNotifications}
+              </span>
+            ) : null}
+          </button>
+          <button type="button" onClick={onSignOut} className="btn-primary px-4 py-2.5">
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </div>
       </div>
     </header>
   );

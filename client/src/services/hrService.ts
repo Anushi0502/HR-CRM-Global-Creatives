@@ -16,6 +16,8 @@ import type {
   UpdateAttendanceRecordPayload,
   UpdateCRMSettingsPayload,
   UpdateEmployeePayload,
+  Notification,
+  NotificationRole,
   Task,
   TaskPriority,
   TaskStatus,
@@ -103,6 +105,15 @@ interface TaskRow {
   created_at: string;
 }
 
+interface NotificationRow {
+  id: number;
+  role: NotificationRole;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
 interface SettingsRow {
   id: number;
   company_name: string;
@@ -117,6 +128,7 @@ let employeesUserIdState: "unknown" | "missing" | "available" = "unknown";
 let currentEmployeeCache: { userId: string; employee: Employee } | null = null;
 let currentEmployeePromise: Promise<Employee> | null = null;
 let currentEmployeePromiseUserId: string | null = null;
+let notificationsTableCache: "notifications" | "alerts" | null = null;
 
 function assertSupabase() {
   if (!supabase) {
@@ -124,6 +136,39 @@ function assertSupabase() {
   }
 
   return supabase;
+}
+
+function isMissingTableError(message: string | undefined): boolean {
+  const normalized = message?.toLowerCase() ?? "";
+  return normalized.includes("does not exist") || normalized.includes("relation");
+}
+
+async function fetchNotificationsTable(role: NotificationRole, table: "notifications" | "alerts") {
+  const client = assertSupabase();
+  const { data, error } = await client
+    .from(table)
+    .select("id, role, title, message, read, created_at")
+    .eq("role", role)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => toNotification(row as NotificationRow));
+}
+
+async function updateNotificationsRead(role: NotificationRole, table: "notifications" | "alerts") {
+  const client = assertSupabase();
+  const { error } = await client
+    .from(table)
+    .update({ read: true })
+    .eq("role", role)
+    .eq("read", false);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 function toEmployee(row: EmployeeRow): Employee {
@@ -207,6 +252,17 @@ function toTask(row: TaskRow): Task {
     assigneeName: row.assignee_name,
     createdBy: row.created_by,
     createdByEmail: row.created_by_email,
+    createdAt: row.created_at,
+  };
+}
+
+function toNotification(row: NotificationRow): Notification {
+  return {
+    id: String(row.id),
+    role: row.role,
+    title: row.title,
+    message: row.message,
+    read: row.read,
     createdAt: row.created_at,
   };
 }
@@ -457,6 +513,42 @@ async function assertTaskAssignmentPermission(taskId: string): Promise<void> {
 }
 
 export const hrService = {
+  getNotifications: async (role: NotificationRole): Promise<Notification[]> => {
+    if (notificationsTableCache) {
+      return fetchNotificationsTable(role, notificationsTableCache);
+    }
+
+    try {
+      const data = await fetchNotificationsTable(role, "notifications");
+      notificationsTableCache = "notifications";
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (isMissingTableError(message)) {
+        const data = await fetchNotificationsTable(role, "alerts");
+        notificationsTableCache = "alerts";
+        return data;
+      }
+      throw error;
+    }
+  },
+
+  markNotificationsRead: async (role: NotificationRole): Promise<void> => {
+    const preferred = notificationsTableCache ?? "notifications";
+    try {
+      await updateNotificationsRead(role, preferred);
+      notificationsTableCache = preferred;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (preferred === "notifications" && isMissingTableError(message)) {
+        await updateNotificationsRead(role, "alerts");
+        notificationsTableCache = "alerts";
+        return;
+      }
+      throw error;
+    }
+  },
+
   getDashboardOverview: async (): Promise<DashboardOverview> => {
     const client = assertSupabase();
 

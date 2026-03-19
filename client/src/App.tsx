@@ -134,6 +134,7 @@ export default function App() {
                 onSignOut={() => void signOut()}
                 items={adminNavItems}
                 workspaceLabel="Admin Command Center"
+                userRole={role ?? "admin"}
               />
             }
           >
@@ -157,6 +158,7 @@ export default function App() {
                 onSignOut={() => void signOut()}
                 items={employeeNavItems}
                 workspaceLabel="Employee Workspace"
+                userRole={role ?? "employee"}
               />
             }
           >
