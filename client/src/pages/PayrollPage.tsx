@@ -166,11 +166,6 @@ export function PayrollPage() {
   const averageNetPay = filteredRecords.length > 0 ? summary.totalNetPay / filteredRecords.length : 0;
   const deductionRate = summary.totalNetPay > 0 ? (summary.totalDeductions / (summary.totalNetPay + summary.totalDeductions)) * 100 : 0;
   const netPayPreview = Math.max(Number(formState.baseSalary) + Number(formState.bonus) - Number(formState.deductions), 0);
-  const grossPayPreview = Math.max(Number(formState.baseSalary) + Number(formState.bonus), 0);
-  const deductionRatePreview = grossPayPreview > 0 ? (Number(formState.deductions) / grossPayPreview) * 100 : 0;
-  const latestPayrollSnapshot = formState.employeeId
-    ? latestRecordByEmployee.get(formState.employeeId) ?? latestRecordByEmployee.get(formState.employeeName)
-    : null;
   const hasActiveFilters = Boolean(search || department || monthFilter || statusFilter || focusMode !== "all");
   const allVisibleSelected = filteredRecords.length > 0 && selectedIds.length === filteredRecords.length;
 

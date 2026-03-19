@@ -3,6 +3,7 @@ import type { AttendanceRecord, Candidate, CRMSettings, Employee, LeaveRequest, 
 export const seedEmployees: Employee[] = [
   {
     id: "EMP-1001",
+    userId: null,
     name: "Avery Brooks",
     email: "avery.brooks@gcs.us",
     role: "HR Director",
@@ -15,6 +16,7 @@ export const seedEmployees: Employee[] = [
   },
   {
     id: "EMP-1002",
+    userId: null,
     name: "Nora Patel",
     email: "nora.patel@gcs.us",
     role: "Senior Designer",
@@ -27,6 +29,7 @@ export const seedEmployees: Employee[] = [
   },
   {
     id: "EMP-1003",
+    userId: null,
     name: "Isaiah Moore",
     email: "isaiah.moore@gcs.us",
     role: "Marketing Specialist",
@@ -39,6 +42,7 @@ export const seedEmployees: Employee[] = [
   },
   {
     id: "EMP-1004",
+    userId: null,
     name: "Sophia Nguyen",
     email: "sophia.nguyen@gcs.us",
     role: "Account Manager",
@@ -51,6 +55,7 @@ export const seedEmployees: Employee[] = [
   },
   {
     id: "EMP-1005",
+    userId: null,
     name: "Liam Johnson",
     email: "liam.johnson@gcs.us",
     role: "Frontend Engineer",
@@ -63,6 +68,7 @@ export const seedEmployees: Employee[] = [
   },
   {
     id: "EMP-1006",
+    userId: null,
     name: "Mila Torres",
     email: "mila.torres@gcs.us",
     role: "Finance Executive",
@@ -192,6 +198,7 @@ export const seedCandidates: Candidate[] = [
 export const seedPayrollRecords: PayrollRecord[] = [
   {
     id: "PAY-901",
+    employeeId: "EMP-1001",
     month: "March 2026",
     employeeName: "Avery Brooks",
     department: "Human Resources",
@@ -203,6 +210,7 @@ export const seedPayrollRecords: PayrollRecord[] = [
   },
   {
     id: "PAY-902",
+    employeeId: "EMP-1002",
     month: "March 2026",
     employeeName: "Nora Patel",
     department: "Creative",
@@ -214,6 +222,7 @@ export const seedPayrollRecords: PayrollRecord[] = [
   },
   {
     id: "PAY-903",
+    employeeId: "EMP-1005",
     month: "March 2026",
     employeeName: "Liam Johnson",
     department: "Technology",
