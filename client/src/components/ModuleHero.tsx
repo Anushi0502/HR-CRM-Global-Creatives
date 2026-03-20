@@ -11,7 +11,7 @@ interface ModuleHeroProps {
 export function ModuleHero({ icon: Icon, title, subtitle, chips, spotlight }: ModuleHeroProps) {
   return (
     <section className="relative overflow-hidden rounded-2xl border border-brand-200/70 bg-white p-5 shadow-soft">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(249,115,22,0.12),transparent_42%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.22),transparent_42%)]" />
       <div className="flex items-start gap-3">
         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
           <Icon className="h-4 w-4" />

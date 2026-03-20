@@ -67,7 +67,7 @@ export function EmployeePayrollPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <section className="relative overflow-hidden rounded-[32px] border border-brand-200 bg-[linear-gradient(135deg,rgba(26,42,105,0.96),rgba(59,130,246,0.9))] p-6 text-white shadow-soft">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.16),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(249,115,22,0.12),transparent_28%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.16),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(191,219,254,0.14),transparent_28%)]" />
           <div className="relative">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/70">Latest Statement</p>
             <p className="mt-3 font-display text-4xl font-extrabold">{latestPayroll ? formatCurrency(latestPayroll.netPay) : "--"}</p>

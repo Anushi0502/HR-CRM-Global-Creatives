@@ -23,9 +23,9 @@ const formatTimestamp = (value: string) => {
 
 export function NotificationsPanel({ notifications, loading, error, unreadCount, onMarkAllRead }: NotificationsPanelProps) {
   return (
-    <section className="relative mt-6 overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(100deg,rgba(42,123,155,1)_0%,rgba(87,197,199,1)_51%,rgba(255,157,0,1)_100%)] p-6 shadow-[0_28px_70px_rgba(2,6,23,0.55)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_55%),radial-gradient(circle_at_bottom,rgba(0,0,0,0.18),transparent_60%)]" />
-      <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1a2a69,#3b82f6,#f97316)]" />
+    <section className="relative mt-6 overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(110deg,rgba(26,42,105,0.98)_0%,rgba(59,130,246,0.92)_62%,rgba(191,219,254,0.88)_100%)] p-6 shadow-[0_28px_70px_rgba(2,6,23,0.55)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.2),transparent_55%),radial-gradient(circle_at_bottom,rgba(15,23,42,0.18),transparent_60%)]" />
+      <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1a2a69,#3b82f6,#ffffff)]" />
       <div className="relative flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-white">Notifications</h3>
