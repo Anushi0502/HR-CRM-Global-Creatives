@@ -112,7 +112,7 @@ export function DataTable<T>({
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse bg-white/90">
-            <thead className="sticky top-0 z-10 bg-[linear-gradient(90deg,#1a2a69,#3b82f6)] text-white">
+            <thead className="sticky top-0 z-10 bg-[linear-gradient(90deg,#0078db,#0095ff,#2ba8ff)] text-white">
               <tr>
                 {columns.map((column) => (
                   <th key={column.key} className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.12em] ${column.headerClassName ?? ""}`}>

@@ -44,6 +44,7 @@ export function TasksPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [requiresEmployeeSetup, setRequiresEmployeeSetup] = useState(false);
 
   const employeesById = useMemo(() => {
     return new Map((employeesHook.data ?? []).map((employee) => [employee.id, employee]));
@@ -61,7 +62,16 @@ export function TasksPage() {
     }));
   }, [currentEmployee]);
 
-  if (role === "employee" && isNewUserEmployeeSetupError(currentEmployeeHook.error)) {
+  if (
+    role === "employee" &&
+    (
+      requiresEmployeeSetup ||
+      isNewUserEmployeeSetupError(currentEmployeeHook.error) ||
+      isNewUserEmployeeSetupError(tasksHook.error) ||
+      isNewUserEmployeeSetupError(employeesHook.error) ||
+      isNewUserEmployeeSetupError(submitError)
+    )
+  ) {
     return <NewUserSetupModal email={profile?.email} />;
   }
 
@@ -102,6 +112,7 @@ export function TasksPage() {
       }
 
       await hrService.createTask(payload);
+      setRequiresEmployeeSetup(false);
       setFormState({
         title: "",
         description: "",
@@ -113,7 +124,13 @@ export function TasksPage() {
       });
       await tasksHook.refetch();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to create task.");
+      const message = error instanceof Error ? error.message : "Unable to create task.";
+      if (role === "employee" && isNewUserEmployeeSetupError(message)) {
+        setRequiresEmployeeSetup(true);
+        setSubmitError(null);
+        return;
+      }
+      setSubmitError(message);
     } finally {
       setSubmitting(false);
     }
@@ -123,7 +140,15 @@ export function TasksPage() {
     setUpdatingId(taskId);
     try {
       await hrService.updateTaskStatus(taskId, status);
+      setRequiresEmployeeSetup(false);
       await tasksHook.refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to update task status.";
+      if (role === "employee" && isNewUserEmployeeSetupError(message)) {
+        setRequiresEmployeeSetup(true);
+        return;
+      }
+      setSubmitError(message);
     } finally {
       setUpdatingId(null);
     }

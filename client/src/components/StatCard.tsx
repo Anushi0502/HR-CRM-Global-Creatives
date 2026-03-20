@@ -13,7 +13,7 @@ export function StatCard({ title, value, hint, icon: Icon, trend, accent = false
   return (
     <article className="relative overflow-hidden rounded-xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
       {accent ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#1a2a69,#3b82f6,#ffffff)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#ffffff,#0095ff,#ffffff)]" />
       ) : null}
       <div className="flex items-center justify-between gap-3">
         <div>
