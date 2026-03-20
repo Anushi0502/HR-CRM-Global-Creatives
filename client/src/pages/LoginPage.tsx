@@ -157,25 +157,25 @@ export function LoginPage({
             <h1 className="mt-6 font-display text-5xl font-extrabold leading-[1.02] text-white">
               Premium HR CRM access with a sharper operational shell.
             </h1>
-            <p className="mt-4 max-w-lg text-base leading-relaxed text-white/78">
+            <p className="mt-4 max-w-lg text-base leading-relaxed text-white/90">
               Sign in to the admin or employee workspace with secure Supabase auth, role-aware access, and faster day-to-day workflows.
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
               <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/55">Access</p>
+                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/82">Access</p>
                 <p className="mt-2 text-2xl font-extrabold">2</p>
-                <p className="mt-1 text-sm text-white/68">Admin + Employee workspaces</p>
+                <p className="mt-1 text-sm text-white/88">Admin + Employee workspaces</p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/55">Auth</p>
+                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/82">Auth</p>
                 <p className="mt-2 text-2xl font-extrabold">OAuth</p>
-                <p className="mt-1 text-sm text-white/68">Google and GitHub ready</p>
+                <p className="mt-1 text-sm text-white/88">Google and GitHub ready</p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/55">Security</p>
+                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/82">Security</p>
                 <p className="mt-2 text-2xl font-extrabold">RLS</p>
-                <p className="mt-1 text-sm text-white/68">Role-aligned data visibility</p>
+                <p className="mt-1 text-sm text-white/88">Role-aligned data visibility</p>
               </div>
             </div>
 
@@ -192,7 +192,7 @@ export function LoginPage({
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3 rounded-2xl border border-white/8 bg-black/10 px-4 py-3">
                     <CircleCheckBig className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
-                    <span className="text-white/84">{item}</span>
+                    <span className="text-white/92">{item}</span>
                   </li>
                 ))}
               </ul>
@@ -200,20 +200,20 @@ export function LoginPage({
 
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               <div className="rounded-[24px] border border-white/12 bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] p-4">
-                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-white/62">
+                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-white/84">
                   <Building2 className="h-3.5 w-3.5" />
                   Built for operations
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-white/78">
+                <p className="mt-2 text-sm leading-relaxed text-white/90">
                   Designed for HR teams that need controlled access, fast navigation, and a more serious product surface.
                 </p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] p-4">
-                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-white/62">
+                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-white/84">
                   <Clock3 className="h-3.5 w-3.5" />
                   Faster daily flow
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-white/78">
+                <p className="mt-2 text-sm leading-relaxed text-white/90">
                   Cleaner hierarchy reduces friction when employees check attendance and admins review live records.
                 </p>
               </div>

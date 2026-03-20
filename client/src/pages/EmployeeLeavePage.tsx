@@ -111,27 +111,27 @@ export function EmployeeLeavePage() {
               Request Planner
             </p>
             <h2 className="mt-4 font-display text-3xl font-extrabold">Keep leave planning clear and low-friction</h2>
-            <p className="mt-2 max-w-2xl text-sm text-white/78">
+            <p className="mt-2 max-w-2xl text-sm font-medium text-white/90">
               Submit the request once, keep the reason concise, and monitor the approval state from the same screen.
             </p>
 
             <div className="mt-5 grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-white/12 bg-white/8 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Latest Request</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Latest Request</p>
                 <p className="mt-2 text-lg font-bold text-white">{latestLeave ? latestLeave.leaveType.toUpperCase() : "None yet"}</p>
-                <p className="mt-1 text-xs text-white/70">{latestLeave ? latestLeave.status : "You are clear right now."}</p>
+                <p className="mt-1 text-xs font-medium text-white/86">{latestLeave ? latestLeave.status : "You are clear right now."}</p>
               </div>
               <div className="rounded-2xl border border-white/12 bg-white/8 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Pending Queue</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Pending Queue</p>
                 <p className="mt-2 text-3xl font-extrabold text-white">{stats.pending}</p>
-                <p className="mt-1 text-xs text-white/70">Requests waiting on review.</p>
+                <p className="mt-1 text-xs font-medium text-white/86">Requests waiting on review.</p>
               </div>
               <div className="rounded-2xl border border-white/12 bg-white/8 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Approval Rate</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Approval Rate</p>
                 <p className="mt-2 text-3xl font-extrabold text-white">
                   {stats.total > 0 ? `${Math.round((stats.approved / stats.total) * 100)}%` : "--"}
                 </p>
-                <p className="mt-1 text-xs text-white/70">Approved vs total requests.</p>
+                <p className="mt-1 text-xs font-medium text-white/86">Approved vs total requests.</p>
               </div>
             </div>
           </div>

@@ -18,7 +18,7 @@ export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
             <Sparkles className="h-4 w-4" />
           </span>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Workspace</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">Workspace</p>
             <p className="text-lg font-semibold text-slate-900">{workspaceLabel}</p>
           </div>
         </div>
@@ -33,7 +33,7 @@ export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
               className={({ isActive }) =>
                 clsx(
                   "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition",
-                  isActive ? "bg-brand-50 text-brand-900" : "text-slate-600 hover:bg-slate-100",
+                  isActive ? "bg-brand-50 text-brand-900" : "text-slate-700 hover:bg-slate-100",
                 )
               }
             >
@@ -42,7 +42,7 @@ export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
                   <span
                     className={clsx(
                       "flex h-8 w-8 items-center justify-center rounded-md transition",
-                      isActive ? "bg-brand-100 text-brand-900" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200",
+                      isActive ? "bg-brand-100 text-brand-900" : "bg-slate-100 text-slate-700 group-hover:bg-slate-200",
                     )}
                   >
                     <item.icon className="h-4 w-4" />

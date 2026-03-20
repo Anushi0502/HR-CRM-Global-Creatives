@@ -14,8 +14,8 @@ export function SectionCard({ title, subtitle, children, rightSlot }: SectionCar
       {title ? (
         <header className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/70 pb-4">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight text-ink">{title}</h2>
-            {subtitle ? <p className="mt-1 text-sm font-medium leading-relaxed text-slate-600">{subtitle}</p> : null}
+            <h2 className="text-xl font-semibold tracking-tight text-slate-950">{title}</h2>
+            {subtitle ? <p className="mt-1 text-sm font-medium leading-relaxed text-slate-700">{subtitle}</p> : null}
           </div>
           {rightSlot ? <div className="shrink-0">{rightSlot}</div> : null}
         </header>

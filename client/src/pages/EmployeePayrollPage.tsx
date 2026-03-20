@@ -69,21 +69,21 @@ export function EmployeePayrollPage() {
         <section className="relative overflow-hidden rounded-[32px] border border-brand-200 bg-[linear-gradient(135deg,rgba(26,42,105,0.96),rgba(59,130,246,0.9))] p-6 text-white shadow-soft">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.16),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(191,219,254,0.14),transparent_28%)]" />
           <div className="relative">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/70">Latest Statement</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/88">Latest Statement</p>
             <p className="mt-3 font-display text-4xl font-extrabold">{latestPayroll ? formatCurrency(latestPayroll.netPay) : "--"}</p>
-            <p className="mt-1 text-sm text-white/72">{latestPayroll?.month ?? "No statement has been processed yet."}</p>
+            <p className="mt-1 text-sm font-medium text-white/90">{latestPayroll?.month ?? "No statement has been processed yet."}</p>
 
             <div className="mt-5 grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-white/12 bg-white/8 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Base</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Base</p>
                 <p className="mt-2 text-lg font-bold text-white">{latestPayroll ? formatCurrency(latestPayroll.baseSalary) : "--"}</p>
               </div>
               <div className="rounded-2xl border border-white/12 bg-white/8 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Bonus</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Bonus</p>
                 <p className="mt-2 text-lg font-bold text-white">{latestPayroll ? formatCurrency(latestPayroll.bonus) : "--"}</p>
               </div>
               <div className="rounded-2xl border border-white/12 bg-white/8 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Deductions</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Deductions</p>
                 <p className="mt-2 text-lg font-bold text-white">{latestPayroll ? formatCurrency(latestPayroll.deductions) : "--"}</p>
               </div>
             </div>

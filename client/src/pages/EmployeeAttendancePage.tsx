@@ -176,34 +176,34 @@ export function EmployeeAttendancePage() {
                   <Sparkles className="h-3.5 w-3.5" />
                   Daily Pulse
                 </p>
-                <p className="mt-4 text-sm font-semibold uppercase tracking-[0.16em] text-white/70">Today</p>
+                <p className="mt-4 text-sm font-semibold uppercase tracking-[0.16em] text-white/88">Today</p>
                 <h3 className="mt-1 font-display text-3xl font-extrabold">{todaySummaryLabel}</h3>
-                <p className="mt-2 max-w-xl text-sm text-white/78">{todaySummaryText}</p>
+                <p className="mt-2 max-w-xl text-sm font-medium text-white/90">{todaySummaryText}</p>
               </div>
               <div className="min-w-[150px] rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/70">Live Time</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/88">Live Time</p>
                 <p className="mt-2 text-3xl font-extrabold">{nowLabel}</p>
-                <p className="mt-2 text-xs font-medium text-white/70">Attendance stamp follows your current browser time.</p>
+                <p className="mt-2 text-xs font-medium text-white/88">Attendance stamp follows your current browser time.</p>
               </div>
             </div>
 
             <div className="relative mt-5 grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Work Mode</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Work Mode</p>
                 <p className="mt-2 text-lg font-bold text-white">{todayModeLabel}</p>
-                <p className="mt-1 text-xs text-white/70">Switch mode before check-out if your day changes.</p>
+                <p className="mt-1 text-xs font-medium text-white/86">Switch mode before check-out if your day changes.</p>
               </div>
               <div className="rounded-2xl border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Check In</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Check In</p>
                 <p className="mt-2 text-lg font-bold text-white">{todayRecord?.checkIn ?? "--"}</p>
-                <p className="mt-1 text-xs text-white/70">First punch of the day.</p>
+                <p className="mt-1 text-xs font-medium text-white/86">First punch of the day.</p>
               </div>
               <div className="rounded-2xl border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/65">Check Out</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-white/84">Check Out</p>
                 <p className="mt-2 text-lg font-bold text-white">
                   {todayRecord?.checkOut && todayRecord.checkOut !== "--" ? todayRecord.checkOut : "Pending"}
                 </p>
-                <p className="mt-1 text-xs text-white/70">Close the day when your shift ends.</p>
+                <p className="mt-1 text-xs font-medium text-white/86">Close the day when your shift ends.</p>
               </div>
             </div>
           </div>
@@ -223,7 +223,7 @@ export function EmployeeAttendancePage() {
                   <span className="block text-sm font-bold text-brand-900">
                     {todayRecord ? "Switch to Office" : "Mark Office Check-in"}
                   </span>
-                  <span className="block text-xs font-medium text-brand-700">Use this if you are working onsite today.</span>
+                  <span className="block text-xs font-medium text-slate-700">Use this if you are working onsite today.</span>
                 </span>
               </span>
               {todayRecord?.status === "present" || todayRecord?.status === "late" ? <BadgeCheck className="h-5 w-5 text-emerald-600" /> : null}
@@ -243,7 +243,7 @@ export function EmployeeAttendancePage() {
                   <span className="block text-sm font-bold text-brand-900">
                     {todayRecord ? "Switch to Remote" : "Mark Remote Check-in"}
                   </span>
-                  <span className="block text-xs font-medium text-brand-700">Use this if you are logging your day from home.</span>
+                  <span className="block text-xs font-medium text-slate-700">Use this if you are logging your day from home.</span>
                 </span>
               </span>
               {todayRecord?.status === "remote" ? <BadgeCheck className="h-5 w-5 text-emerald-600" /> : null}
@@ -261,7 +261,7 @@ export function EmployeeAttendancePage() {
                 </span>
                 <span>
                   <span className="block text-sm font-bold">Mark Check-out</span>
-                  <span className="block text-xs font-medium text-white/70">Close the day once your work session is complete.</span>
+                  <span className="block text-xs font-medium text-white/86">Close the day once your work session is complete.</span>
                 </span>
               </span>
               {checkedOut ? <BadgeCheck className="h-5 w-5 text-emerald-300" /> : null}
