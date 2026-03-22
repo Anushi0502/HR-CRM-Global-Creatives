@@ -45,6 +45,21 @@ export function LeavePage() {
     }
   };
 
+  const updateCompensation = async (id: string, compensated: boolean) => {
+    setUpdatingId(id);
+    setDetailMessage(null);
+
+    try {
+      await hrService.updateLeaveCompensation(id, compensated);
+      await leaveHook.refetch();
+      setDetailMessage(compensated ? "Marked as compensated." : "Marked as not compensated.");
+    } catch (error) {
+      setDetailMessage(error instanceof Error ? error.message : "Unable to update compensation status.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const filteredRequests = useMemo(() => {
     const list = leaveHook.data ?? [];
     const query = search.trim().toLowerCase();
@@ -92,6 +107,36 @@ export function LeavePage() {
       render: (row) => <span className="line-clamp-1 max-w-[220px] text-brand-700">{row.reason}</span>,
     },
     { key: "status", header: "Status", render: (row) => <StatusBadge value={row.status} /> },
+    {
+      key: "compensated",
+      header: "Compensated",
+      render: (row) => (
+        <div className="flex items-center gap-3 text-xs font-semibold text-slate-600">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              name={`compensated-${row.id}`}
+              checked={row.compensated}
+              onChange={() => void updateCompensation(row.id, true)}
+              disabled={updatingId === row.id}
+              className="h-4 w-4 accent-brand-700"
+            />
+            Yes
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="radio"
+              name={`compensated-${row.id}`}
+              checked={!row.compensated}
+              onChange={() => void updateCompensation(row.id, false)}
+              disabled={updatingId === row.id}
+              className="h-4 w-4 accent-brand-700"
+            />
+            No
+          </label>
+        </div>
+      ),
+    },
     {
       key: "action",
       header: "Action",
@@ -368,6 +413,33 @@ export function LeavePage() {
                   <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                     <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Status</p>
                     <p className="mt-2 text-sm font-semibold text-slate-950">{selectedLeave.status}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Compensated</p>
+                    <div className="mt-2 flex items-center gap-4 text-sm font-semibold text-slate-950">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="compensated-detail"
+                          checked={selectedLeave.compensated}
+                          onChange={() => void updateCompensation(selectedLeave.id, true)}
+                          disabled={updatingId === selectedLeave.id}
+                          className="h-4 w-4 accent-brand-700"
+                        />
+                        Yes
+                      </label>
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="compensated-detail"
+                          checked={!selectedLeave.compensated}
+                          onChange={() => void updateCompensation(selectedLeave.id, false)}
+                          disabled={updatingId === selectedLeave.id}
+                          className="h-4 w-4 accent-brand-700"
+                        />
+                        No
+                      </label>
+                    </div>
                   </div>
                 </div>
 

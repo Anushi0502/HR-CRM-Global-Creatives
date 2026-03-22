@@ -346,10 +346,16 @@ export function EmployeesPage() {
     setActionMessage(null);
 
     try {
-      await hrService.createEmployee(formState);
+      const result = await hrService.createEmployee(formState);
       setFormState(initialForm);
       await refetch();
-      setActionMessage("Employee profile created.");
+      if (result.invite.status === "sent") {
+        setActionMessage(`Employee profile created and login invite sent to ${result.employee.email}.`);
+      } else if (result.invite.status === "existing_user") {
+        setActionMessage(`Employee profile created. ${result.invite.message}`);
+      } else {
+        setActionMessage(`Employee profile created. Invite status: ${result.invite.message}`);
+      }
     } catch (submitIssue) {
       setSubmitError(submitIssue instanceof Error ? submitIssue.message : "Unable to add employee.");
     } finally {

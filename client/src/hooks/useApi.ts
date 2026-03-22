@@ -26,6 +26,7 @@ export function useApi<T>(fetcher: () => Promise<T>) {
 
   return {
     data,
+    setData,
     loading,
     error,
     refetch,

@@ -6,6 +6,8 @@ export type PayrollStatus = "processed" | "scheduled";
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
 export type TaskPriority = "low" | "medium" | "high" | "critical";
 export type NotificationRole = "admin" | "employee";
+export type AnnouncementAudience = NotificationRole | "all";
+export type InsightTone = "info" | "success" | "warning" | "critical";
 
 export interface DashboardOverview {
   metrics: {
@@ -34,6 +36,24 @@ export interface Employee {
   manager: string;
   status: EmployeeStatus;
   performanceScore: number;
+  mobile: string | null;
+  address: string | null;
+  pan: string | null;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+}
+
+export type EmployeeInviteStatus = "sent" | "existing_user" | "failed";
+
+export interface EmployeeInviteResult {
+  status: EmployeeInviteStatus;
+  message: string;
+  userId?: string | null;
+}
+
+export interface CreateEmployeeResult {
+  employee: Employee;
+  invite: EmployeeInviteResult;
 }
 
 export interface UpdateEmployeePayload {
@@ -43,6 +63,14 @@ export interface UpdateEmployeePayload {
   manager: string;
   status: EmployeeStatus;
   performanceScore: number;
+}
+
+export interface EmployeeProfileDetailsPayload {
+  mobile: string;
+  address: string;
+  pan: string;
+  bankName: string;
+  bankAccountNumber: string;
 }
 
 export interface AttendanceRecord {
@@ -80,16 +108,20 @@ export interface LeaveRequest {
   days: number;
   reason: string;
   status: LeaveStatus;
+  compensated: boolean;
 }
 
 export interface Candidate {
   id: string;
   name: string;
+  email: string;
   role: string;
   source: string;
   stage: CandidateStage;
   interviewDate: string;
   rating: number;
+  offerLetterSentAt: string | null;
+  offerLetterFileName: string | null;
 }
 
 export interface Task {
@@ -115,6 +147,76 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface Announcement {
+  id: string;
+  audience: AnnouncementAudience;
+  title: string;
+  message: string;
+  tone: InsightTone;
+  ctaLabel: string | null;
+  ctaPath: string | null;
+  createdAt: string;
+}
+
+export interface PriorityItem {
+  id: string;
+  title: string;
+  value: string;
+  meta: string;
+  route: string;
+  tone: InsightTone;
+}
+
+export interface DepartmentSnapshot {
+  department: string;
+  headcount: number;
+  activeCount: number;
+  leaveCount: number;
+  payrollTotal: number;
+  avgPerformance: number;
+}
+
+export interface TaskSummary {
+  todo: number;
+  inProgress: number;
+  blocked: number;
+  done: number;
+  overdue: number;
+  critical: number;
+}
+
+export interface PayrollHealth {
+  scheduledCount: number;
+  processedCount: number;
+  scheduledExposure: number;
+  averageNetPay: number;
+  highestNetPay: number;
+  nextCycleLabel: string | null;
+}
+
+export interface AdminCommandCenter {
+  departmentSnapshots: DepartmentSnapshot[];
+  taskSummary: TaskSummary;
+  payrollHealth: PayrollHealth;
+  attendanceBreakdown: AttendanceSummary;
+  candidatePipeline: Array<{
+    stage: CandidateStage;
+    count: number;
+  }>;
+  priorityItems: PriorityItem[];
+}
+
+export interface EmployeeCommandCenter {
+  attendanceStreak: number;
+  pendingTasks: number;
+  completedTasks: number;
+  pendingApprovals: number;
+  nextPayrollMonth: string | null;
+  activeTasks: Task[];
+  upcomingLeaves: LeaveRequest[];
+  focusItems: PriorityItem[];
+}
+
 export interface NewTaskPayload {
   title: string;
   description?: string;
@@ -127,6 +229,7 @@ export interface NewTaskPayload {
 
 export interface NewCandidatePayload {
   name: string;
+  email: string;
   role: string;
   source: string;
   stage: CandidateStage;
@@ -145,6 +248,8 @@ export interface PayrollRecord {
   deductions: number;
   netPay: number;
   status: PayrollStatus;
+  payslipSentAt: string | null;
+  payslipFileName: string | null;
 }
 
 export interface NewPayrollRecordPayload {
@@ -201,6 +306,12 @@ export interface NewEmployeePayload {
   manager: string;
   status: EmployeeStatus;
   performanceScore: number;
+}
+
+export interface DocumentDispatchResult {
+  status: "sent" | "skipped" | "failed";
+  message: string;
+  fileName?: string | null;
 }
 
 export interface NewLeaveRequestPayload {

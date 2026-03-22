@@ -12,7 +12,7 @@ import { useApi } from "../hooks/useApi";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { hrService, isNewUserEmployeeSetupError } from "../services/hrService";
 import type { PayrollRecord } from "../types/hr";
-import { formatCurrency } from "../utils/formatters";
+import { formatCurrency, formatDate } from "../utils/formatters";
 
 export function EmployeePayrollPage() {
   const { profile } = useAuthSession();
@@ -41,6 +41,16 @@ export function EmployeePayrollPage() {
     { key: "deduction", header: "Deductions", render: (row) => formatCurrency(row.deductions) },
     { key: "net", header: "Net Pay", render: (row) => <span className="font-semibold text-brand-900">{formatCurrency(row.netPay)}</span> },
     { key: "status", header: "Status", render: (row) => <StatusBadge value={row.status} /> },
+    {
+      key: "payslip",
+      header: "Payslip Email",
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-slate-950">{row.payslipSentAt ? formatDate(row.payslipSentAt) : "Not sent yet"}</p>
+          <p className="text-xs text-slate-500">{row.payslipFileName ?? "Salary slip email pending"}</p>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -112,7 +122,11 @@ export function EmployeePayrollPage() {
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Secure history
               </p>
-              <p className="mt-2 text-sm font-medium text-emerald-900">Use this space to confirm each processed payout and keep your records aligned.</p>
+              <p className="mt-2 text-sm font-medium text-emerald-900">
+                {latestPayroll?.payslipSentAt
+                  ? `Latest salary slip emailed on ${formatDate(latestPayroll.payslipSentAt)}${latestPayroll.payslipFileName ? ` as ${latestPayroll.payslipFileName}.` : "."}`
+                  : "Use this space to confirm each processed payout and keep your records aligned."}
+              </p>
             </div>
           </div>
         </SectionCard>

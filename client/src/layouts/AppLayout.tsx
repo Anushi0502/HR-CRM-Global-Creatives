@@ -3,12 +3,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppMobileNav } from "../components/AppMobileNav";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppTopbar } from "../components/AppTopbar";
+import { EmployeePrivateDetailsForm } from "../components/EmployeePrivateDetailsForm";
 import { NotificationsPanel } from "../components/NotificationsPanel";
 import { QuickLinksFooter } from "../components/QuickLinksFooter";
-import { hrService } from "../services/hrService";
-import type { Notification } from "../types/hr";
+import { WorkspaceCommandPalette } from "../components/WorkspaceCommandPalette";
+import { hrService, isNewUserEmployeeSetupError } from "../services/hrService";
+import type { Employee, EmployeeProfileDetailsPayload, Notification } from "../types/hr";
 import type { UserRole } from "../types/auth";
 import type { NavItem } from "../types/navigation";
+import {
+  emptyEmployeeProfileDetails,
+  hasCompleteEmployeeProfileDetails,
+  toEmployeeProfileDetailsPayload,
+} from "../utils/employeeProfile";
 
 interface AppLayoutProps {
   onSignOut: () => void;
@@ -22,11 +29,23 @@ export function AppLayout({ onSignOut, items, workspaceLabel, userRole }: AppLay
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [profilePromptDraft, setProfilePromptDraft] =
+    useState<EmployeeProfileDetailsPayload>(emptyEmployeeProfileDetails);
+  const [profilePromptLoading, setProfilePromptLoading] = useState(false);
+  const [profilePromptError, setProfilePromptError] = useState<string | null>(null);
+  const [profilePromptMessage, setProfilePromptMessage] = useState<string | null>(null);
 
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item.read).length,
     [notifications],
   );
+  const requiresProfileCompletion =
+    userRole === "employee" &&
+    !profilePromptLoading &&
+    currentEmployee !== null &&
+    !hasCompleteEmployeeProfileDetails(currentEmployee);
 
   const loadNotifications = useCallback(async () => {
     setNotificationsLoading(true);
@@ -42,9 +61,51 @@ export function AppLayout({ onSignOut, items, workspaceLabel, userRole }: AppLay
     }
   }, [userRole]);
 
+
+  const loadCurrentEmployee = useCallback(async () => {
+    if (userRole !== "employee") {
+      setCurrentEmployee(null);
+      setProfilePromptDraft(emptyEmployeeProfileDetails);
+      return;
+    }
+
+    setProfilePromptLoading(true);
+    setProfilePromptError(null);
+
+    try {
+      const employee = await hrService.getCurrentEmployee();
+      setCurrentEmployee(employee);
+      setProfilePromptDraft(toEmployeeProfileDetailsPayload(employee));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to load employee profile.";
+      if (!isNewUserEmployeeSetupError(message)) {
+        setProfilePromptError(message);
+      }
+      setCurrentEmployee(null);
+    } finally {
+      setProfilePromptLoading(false);
+    }
+  }, [userRole]);
+
   useEffect(() => {
     void loadNotifications();
   }, [loadNotifications]);
+
+  useEffect(() => {
+    void loadCurrentEmployee();
+  }, [loadCurrentEmployee]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleToggleNotifications = () => {
     setShowNotifications((previous) => {
@@ -73,6 +134,32 @@ export function AppLayout({ onSignOut, items, workspaceLabel, userRole }: AppLay
     }
   };
 
+  const handleProfileDraftChange = (field: keyof EmployeeProfileDetailsPayload, value: string) => {
+    setProfilePromptMessage(null);
+    setProfilePromptError(null);
+    setProfilePromptDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleProfilePromptSave = async () => {
+    setProfilePromptLoading(true);
+    setProfilePromptError(null);
+    setProfilePromptMessage(null);
+
+    try {
+      const employee = await hrService.upsertMyProfileDetails(profilePromptDraft);
+      setCurrentEmployee(employee);
+      setProfilePromptDraft(toEmployeeProfileDetailsPayload(employee));
+      setProfilePromptMessage("Profile details saved.");
+    } catch (error) {
+      setProfilePromptError(error instanceof Error ? error.message : "Unable to save profile details.");
+    } finally {
+      setProfilePromptLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-transparent">
       <div className="flex min-h-screen">
@@ -83,6 +170,7 @@ export function AppLayout({ onSignOut, items, workspaceLabel, userRole }: AppLay
             items={items}
             workspaceLabel={workspaceLabel}
             onToggleNotifications={handleToggleNotifications}
+            onOpenCommandPalette={() => setCommandPaletteOpen(true)}
             unreadNotifications={unreadCount}
             notificationsOpen={showNotifications}
           />
@@ -104,6 +192,43 @@ export function AppLayout({ onSignOut, items, workspaceLabel, userRole }: AppLay
         </div>
       </div>
       <AppMobileNav items={items} />
+      <WorkspaceCommandPalette
+        isOpen={commandPaletteOpen}
+        items={items}
+        workspaceLabel={workspaceLabel}
+        onClose={() => setCommandPaletteOpen(false)}
+        onOpenNotifications={handleToggleNotifications}
+      />
+      {requiresProfileCompletion ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-3xl rounded-[32px] border border-brand-200 bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.22)]">
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3">
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-brand-700">
+                First Login Setup
+              </p>
+              <h2 className="mt-2 font-display text-2xl font-extrabold text-brand-950">
+                Complete your payroll and compliance details
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Add PAN, address, mobile, bank name, and account number before continuing. These
+                details are used in your employee profile and salary slips.
+              </p>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+              <EmployeePrivateDetailsForm
+                value={profilePromptDraft}
+                onChange={handleProfileDraftChange}
+                onSubmit={handleProfilePromptSave}
+                submitting={profilePromptLoading}
+                submitLabel="Save and continue"
+                error={profilePromptError}
+                successMessage={profilePromptMessage}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -6,4 +6,25 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+
+          if (id.includes("@supabase")) {
+            return "supabase";
+          }
+
+          if (id.includes("lucide-react")) {
+            return "icons";
+          }
+
+          return "vendor";
+        },
+      },
+    },
+  },
 });

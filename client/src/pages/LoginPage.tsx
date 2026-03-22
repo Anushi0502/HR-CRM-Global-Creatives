@@ -225,7 +225,10 @@ export function LoginPage({
         <section className="bg-[linear-gradient(180deg,rgba(248,251,255,0.96),rgba(234,242,252,0.94))] p-5 sm:p-8 lg:p-10">
           <div className="mx-auto max-w-xl rounded-[32px] border border-white/80 bg-white/84 p-5 shadow-[0_28px_80px_-46px_rgba(8,17,38,0.55)] backdrop-blur-xl sm:p-7">
             <div className="mb-6 text-center lg:text-left">
-              <BrandLogo size="lg" containerClassName="mx-auto rounded-[24px] px-4 py-3 lg:mx-0" />
+              <BrandLogo
+                size="lg"
+                containerClassName="mx-auto rounded-full border border-brand-900/50 bg-[linear-gradient(90deg,var(--brand-900)_0%,var(--brand-800)_32%,var(--brand-700)_60%,var(--brand-500)_82%,var(--brand-200)_100%)] px-6 py-3 shadow-[0_18px_45px_-30px_rgba(0,90,168,0.65)] lg:mx-0"
+              />
               <p className="mt-4 text-[0.68rem] font-black uppercase tracking-[0.22em] text-brand-700">Global Creative Services</p>
               <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-brand-950 sm:text-[2.4rem]">
                 {mode === "login" ? "Access your workspace" : "Create your workspace account"}

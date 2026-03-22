@@ -29,6 +29,17 @@ create table if not exists public.employees (
 
 alter table public.employees add column if not exists user_id uuid;
 
+create table if not exists public.employee_private_details (
+  employee_id text primary key references public.employees(id) on delete cascade,
+  mobile text,
+  address text,
+  pan text,
+  bank_name text,
+  bank_account_number text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.attendance_records (
   id text primary key,
   employee_id text not null references public.employees(id) on delete cascade,
@@ -50,19 +61,29 @@ create table if not exists public.leave_requests (
   days integer not null check (days > 0),
   reason text not null,
   status text not null check (status in ('approved', 'pending', 'rejected')),
+  compensated boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.leave_requests add column if not exists compensated boolean not null default false;
 
 create table if not exists public.candidates (
   id text primary key,
   name text not null,
+  email text not null,
   role text not null,
   source text not null,
   stage text not null check (stage in ('sourced', 'interview', 'offer', 'hired', 'rejected')),
   interview_date date not null,
   rating integer not null check (rating >= 1 and rating <= 5),
+  offer_letter_sent_at timestamptz,
+  offer_letter_file_name text,
   created_at timestamptz not null default now()
 );
+
+alter table public.candidates add column if not exists email text;
+alter table public.candidates add column if not exists offer_letter_sent_at timestamptz;
+alter table public.candidates add column if not exists offer_letter_file_name text;
 
 create table if not exists public.payroll_records (
   id text primary key,
@@ -75,10 +96,14 @@ create table if not exists public.payroll_records (
   deductions numeric(12,2) not null check (deductions >= 0),
   net_pay numeric(12,2) not null check (net_pay >= 0),
   status text not null check (status in ('processed', 'scheduled')),
+  payslip_sent_at timestamptz,
+  payslip_file_name text,
   created_at timestamptz not null default now()
 );
 
 alter table public.payroll_records add column if not exists employee_id text;
+alter table public.payroll_records add column if not exists payslip_sent_at timestamptz;
+alter table public.payroll_records add column if not exists payslip_file_name text;
 
 create table if not exists public.tasks (
   id text primary key,
@@ -121,6 +146,26 @@ create table if not exists public.crm_settings (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.notifications (
+  id text primary key,
+  role text not null check (role in ('admin', 'employee')),
+  title text not null,
+  message text not null,
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.announcements (
+  id text primary key,
+  audience text not null check (audience in ('admin', 'employee', 'all')),
+  title text not null,
+  message text not null,
+  tone text not null check (tone in ('info', 'success', 'warning', 'critical')),
+  cta_label text,
+  cta_path text,
+  created_at timestamptz not null default now()
+);
+
 do $$
 begin
   if not exists (
@@ -151,14 +196,18 @@ end $$;
 
 create unique index if not exists employees_user_id_unique on public.employees(user_id) where user_id is not null;
 create index if not exists employees_email_lower_idx on public.employees(lower(email));
+create index if not exists employee_private_details_employee_idx on public.employee_private_details(employee_id);
 create index if not exists attendance_employee_idx on public.attendance_records(employee_id);
 create unique index if not exists attendance_employee_date_unique on public.attendance_records(employee_id, date);
 create index if not exists leave_employee_idx on public.leave_requests(employee_id);
+create index if not exists candidates_email_lower_idx on public.candidates(lower(email));
 create index if not exists payroll_employee_idx on public.payroll_records(employee_id);
 create index if not exists profiles_email_lower_idx on public.profiles(lower(email));
 create index if not exists tasks_created_by_idx on public.tasks(created_by);
 create index if not exists tasks_assignee_idx on public.tasks(assignee_id);
 create index if not exists tasks_status_idx on public.tasks(status);
+create index if not exists notifications_role_idx on public.notifications(role);
+create index if not exists announcements_audience_idx on public.announcements(audience);
 
 create or replace function public.sync_profile_updated_at()
 returns trigger
@@ -191,6 +240,12 @@ create trigger trg_tasks_updated_at
 before update on public.tasks
 for each row
 execute function public.sync_task_updated_at();
+
+drop trigger if exists trg_employee_private_details_updated_at on public.employee_private_details;
+create trigger trg_employee_private_details_updated_at
+before update on public.employee_private_details
+for each row
+execute function public.sync_profile_updated_at();
 
 create or replace function public.current_role()
 returns text
@@ -440,89 +495,6 @@ end $$;
 
 drop index if exists profiles_single_admin_role;
 
-insert into public.employees (id, user_id, name, email, role, department, location, join_date, manager, status, performance_score)
-values
-  ('EMP-0001', null, 'CRM Super Admin', 'test@crm.co.in', 'System Administrator', 'Administration', 'Remote', '2024-01-01', 'Board', 'active', 99),
-  ('EMP-1001', null, 'Avery Brooks', 'avery.brooks@gcs.us', 'HR Director', 'Human Resources', 'New York', '2022-04-18', 'CEO', 'active', 94),
-  ('EMP-1002', null, 'Nora Patel', 'nora.patel@gcs.us', 'Senior Designer', 'Creative', 'Chicago', '2021-11-08', 'Creative Lead', 'active', 91),
-  ('EMP-1003', null, 'Isaiah Moore', 'isaiah.moore@gcs.us', 'Marketing Specialist', 'Marketing', 'Austin', '2023-02-06', 'Marketing Head', 'on_leave', 87),
-  ('EMP-1004', null, 'Sophia Nguyen', 'sophia.nguyen@gcs.us', 'Account Manager', 'Client Success', 'Seattle', '2020-07-21', 'Operations Director', 'active', 89),
-  ('EMP-1005', null, 'Liam Johnson', 'liam.johnson@gcs.us', 'Frontend Engineer', 'Technology', 'Remote', '2024-01-15', 'Engineering Manager', 'active', 86),
-  ('EMP-1006', null, 'Mila Torres', 'mila.torres@gcs.us', 'Finance Executive', 'Finance', 'Miami', '2019-09-02', 'CFO', 'inactive', 78)
-on conflict (id) do update
-set
-  name = excluded.name,
-  email = excluded.email,
-  role = excluded.role,
-  department = excluded.department,
-  location = excluded.location,
-  join_date = excluded.join_date,
-  manager = excluded.manager,
-  status = excluded.status,
-  performance_score = excluded.performance_score;
-
-insert into public.attendance_records (id, employee_id, employee_name, date, check_in, check_out, status)
-values
-  ('ATT-301', 'EMP-1001', 'Avery Brooks', '2026-03-12', '09:04', '18:10', 'present'),
-  ('ATT-302', 'EMP-1002', 'Nora Patel', '2026-03-12', '09:18', '18:06', 'late'),
-  ('ATT-303', 'EMP-1003', 'Isaiah Moore', '2026-03-12', '--', '--', 'absent'),
-  ('ATT-304', 'EMP-1004', 'Sophia Nguyen', '2026-03-12', '08:56', '17:50', 'present'),
-  ('ATT-305', 'EMP-1005', 'Liam Johnson', '2026-03-12', '09:00', '18:20', 'remote')
-on conflict (id) do update
-set
-  employee_id = excluded.employee_id,
-  employee_name = excluded.employee_name,
-  date = excluded.date,
-  check_in = excluded.check_in,
-  check_out = excluded.check_out,
-  status = excluded.status;
-
-insert into public.leave_requests (id, employee_id, employee_name, leave_type, start_date, end_date, days, reason, status)
-values
-  ('LEV-601', 'EMP-1003', 'Isaiah Moore', 'annual', '2026-03-15', '2026-03-18', 4, 'Family travel', 'approved'),
-  ('LEV-602', 'EMP-1005', 'Liam Johnson', 'sick', '2026-03-13', '2026-03-13', 1, 'Fever', 'pending'),
-  ('LEV-603', 'EMP-1002', 'Nora Patel', 'casual', '2026-03-24', '2026-03-25', 2, 'Personal commitment', 'pending')
-on conflict (id) do update
-set
-  employee_id = excluded.employee_id,
-  employee_name = excluded.employee_name,
-  leave_type = excluded.leave_type,
-  start_date = excluded.start_date,
-  end_date = excluded.end_date,
-  days = excluded.days,
-  reason = excluded.reason,
-  status = excluded.status;
-
-insert into public.candidates (id, name, role, source, stage, interview_date, rating)
-values
-  ('CAN-801', 'Jordan Clark', 'Motion Designer', 'LinkedIn', 'interview', '2026-03-14', 4),
-  ('CAN-802', 'Emma Rivera', 'SEO Analyst', 'Referral', 'offer', '2026-03-13', 5),
-  ('CAN-803', 'Noah Kim', 'UI Engineer', 'Indeed', 'sourced', '2026-03-19', 3)
-on conflict (id) do update
-set
-  name = excluded.name,
-  role = excluded.role,
-  source = excluded.source,
-  stage = excluded.stage,
-  interview_date = excluded.interview_date,
-  rating = excluded.rating;
-
-insert into public.payroll_records (id, employee_id, month, employee_name, department, base_salary, bonus, deductions, net_pay, status)
-values
-  ('PAY-901', 'EMP-1001', 'March 2026', 'Avery Brooks', 'Human Resources', 8500, 900, 420, 8980, 'processed'),
-  ('PAY-902', 'EMP-1002', 'March 2026', 'Nora Patel', 'Creative', 6900, 500, 330, 7070, 'processed'),
-  ('PAY-903', 'EMP-1005', 'March 2026', 'Liam Johnson', 'Technology', 6400, 300, 280, 6420, 'scheduled')
-on conflict (id) do update
-set
-  employee_id = excluded.employee_id,
-  month = excluded.month,
-  employee_name = excluded.employee_name,
-  department = excluded.department,
-  base_salary = excluded.base_salary,
-  bonus = excluded.bonus,
-  deductions = excluded.deductions,
-  net_pay = excluded.net_pay,
-  status = excluded.status;
 
 insert into public.crm_settings (company_name, timezone, payroll_cycle, working_days, work_hours, leave_policy)
 select
@@ -534,14 +506,38 @@ select
   '{"annual":18,"sick":10,"casual":8}'::jsonb
 where not exists (select 1 from public.crm_settings);
 
+insert into public.announcements (id, audience, title, message, tone, cta_label, cta_path, created_at)
+values
+  ('ANN-ALL-1', 'all', 'Workspace refresh is live', 'The HR CRM now includes a faster command bar, richer dashboards, and better operational visibility.', 'info', 'Open dashboard', '/', '2026-03-22T06:00:00Z'),
+  ('ANN-ADMIN-1', 'admin', 'Operations review window', 'Audit pending leave, blocked tasks, and scheduled payroll before closing this week''s runbook.', 'warning', 'Review operations', '/admin', '2026-03-22T06:30:00Z'),
+  ('ANN-EMP-1', 'employee', 'Self-service workspace expanded', 'Use the upgraded dashboard to track attendance, leave requests, payroll, and active work from one view.', 'success', 'Open my workspace', '/employee', '2026-03-22T06:45:00Z')
+on conflict (id) do update
+set
+  audience = excluded.audience,
+  title = excluded.title,
+  message = excluded.message,
+  tone = excluded.tone,
+  cta_label = excluded.cta_label,
+  cta_path = excluded.cta_path,
+  created_at = excluded.created_at;
+
+update public.candidates
+set email = lower(replace(name, ' ', '.')) || '@gcs.app'
+where email is null or btrim(email) = '';
+
+alter table public.candidates alter column email set not null;
+
 alter table public.profiles enable row level security;
 alter table public.employees enable row level security;
+alter table public.employee_private_details enable row level security;
 alter table public.attendance_records enable row level security;
 alter table public.leave_requests enable row level security;
 alter table public.candidates enable row level security;
 alter table public.payroll_records enable row level security;
 alter table public.tasks enable row level security;
 alter table public.crm_settings enable row level security;
+alter table public.notifications enable row level security;
+alter table public.announcements enable row level security;
 
 drop policy if exists employees_auth_all on public.employees;
 drop policy if exists attendance_auth_all on public.attendance_records;
@@ -556,6 +552,10 @@ drop policy if exists employees_select_policy on public.employees;
 drop policy if exists employees_insert_policy on public.employees;
 drop policy if exists employees_update_policy on public.employees;
 drop policy if exists employees_delete_policy on public.employees;
+drop policy if exists employee_private_details_select_policy on public.employee_private_details;
+drop policy if exists employee_private_details_insert_policy on public.employee_private_details;
+drop policy if exists employee_private_details_update_policy on public.employee_private_details;
+drop policy if exists employee_private_details_delete_policy on public.employee_private_details;
 drop policy if exists attendance_select_policy on public.attendance_records;
 drop policy if exists attendance_insert_policy on public.attendance_records;
 drop policy if exists attendance_update_policy on public.attendance_records;
@@ -574,6 +574,10 @@ drop policy if exists tasks_update_policy on public.tasks;
 drop policy if exists tasks_delete_policy on public.tasks;
 drop policy if exists settings_select_policy on public.crm_settings;
 drop policy if exists settings_write_policy on public.crm_settings;
+drop policy if exists notifications_select_policy on public.notifications;
+drop policy if exists notifications_update_policy on public.notifications;
+drop policy if exists announcements_select_policy on public.announcements;
+drop policy if exists announcements_write_policy on public.announcements;
 
 create policy profiles_select_policy on public.profiles
   for select to authenticated
@@ -593,6 +597,23 @@ create policy employees_update_policy on public.employees
   with check (public.is_admin());
 
 create policy employees_delete_policy on public.employees
+  for delete to authenticated
+  using (public.is_admin());
+
+create policy employee_private_details_select_policy on public.employee_private_details
+  for select to authenticated
+  using (public.is_admin() or employee_id = public.get_my_employee_id());
+
+create policy employee_private_details_insert_policy on public.employee_private_details
+  for insert to authenticated
+  with check (public.is_admin() or employee_id = public.get_my_employee_id());
+
+create policy employee_private_details_update_policy on public.employee_private_details
+  for update to authenticated
+  using (public.is_admin() or employee_id = public.get_my_employee_id())
+  with check (public.is_admin() or employee_id = public.get_my_employee_id());
+
+create policy employee_private_details_delete_policy on public.employee_private_details
   for delete to authenticated
   using (public.is_admin());
 
@@ -677,6 +698,24 @@ create policy settings_select_policy on public.crm_settings
   using (true);
 
 create policy settings_write_policy on public.crm_settings
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+create policy notifications_select_policy on public.notifications
+  for select to authenticated
+  using (role = public.current_role());
+
+create policy notifications_update_policy on public.notifications
+  for update to authenticated
+  using (role = public.current_role())
+  with check (role = public.current_role());
+
+create policy announcements_select_policy on public.announcements
+  for select to authenticated
+  using (audience = 'all' or audience = public.current_role());
+
+create policy announcements_write_policy on public.announcements
   for all to authenticated
   using (public.is_admin())
   with check (public.is_admin());

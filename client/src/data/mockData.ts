@@ -1,4 +1,13 @@
-import type { AttendanceRecord, Candidate, CRMSettings, Employee, LeaveRequest, PayrollRecord } from "../types/hr";
+import type {
+  Announcement,
+  AttendanceRecord,
+  Candidate,
+  CRMSettings,
+  Employee,
+  LeaveRequest,
+  Notification,
+  PayrollRecord,
+} from "../types/hr";
 
 export const seedEmployees: Employee[] = [
   {
@@ -13,6 +22,11 @@ export const seedEmployees: Employee[] = [
     manager: "CEO",
     status: "active",
     performanceScore: 94,
+    mobile: null,
+    address: null,
+    pan: null,
+    bankName: null,
+    bankAccountNumber: null,
   },
   {
     id: "EMP-1002",
@@ -26,6 +40,11 @@ export const seedEmployees: Employee[] = [
     manager: "Creative Lead",
     status: "active",
     performanceScore: 91,
+    mobile: null,
+    address: null,
+    pan: null,
+    bankName: null,
+    bankAccountNumber: null,
   },
   {
     id: "EMP-1003",
@@ -39,6 +58,11 @@ export const seedEmployees: Employee[] = [
     manager: "Marketing Head",
     status: "on_leave",
     performanceScore: 87,
+    mobile: null,
+    address: null,
+    pan: null,
+    bankName: null,
+    bankAccountNumber: null,
   },
   {
     id: "EMP-1004",
@@ -52,6 +76,11 @@ export const seedEmployees: Employee[] = [
     manager: "Operations Director",
     status: "active",
     performanceScore: 89,
+    mobile: null,
+    address: null,
+    pan: null,
+    bankName: null,
+    bankAccountNumber: null,
   },
   {
     id: "EMP-1005",
@@ -65,6 +94,11 @@ export const seedEmployees: Employee[] = [
     manager: "Engineering Manager",
     status: "active",
     performanceScore: 86,
+    mobile: null,
+    address: null,
+    pan: null,
+    bankName: null,
+    bankAccountNumber: null,
   },
   {
     id: "EMP-1006",
@@ -78,6 +112,11 @@ export const seedEmployees: Employee[] = [
     manager: "CFO",
     status: "inactive",
     performanceScore: 78,
+    mobile: null,
+    address: null,
+    pan: null,
+    bankName: null,
+    bankAccountNumber: null,
   },
 ];
 
@@ -140,6 +179,7 @@ export const seedLeaveRequests: LeaveRequest[] = [
     days: 4,
     reason: "Family travel",
     status: "approved",
+    compensated: false,
   },
   {
     id: "LEV-602",
@@ -151,6 +191,7 @@ export const seedLeaveRequests: LeaveRequest[] = [
     days: 1,
     reason: "Fever",
     status: "pending",
+    compensated: false,
   },
   {
     id: "LEV-603",
@@ -162,6 +203,7 @@ export const seedLeaveRequests: LeaveRequest[] = [
     days: 2,
     reason: "Personal commitment",
     status: "pending",
+    compensated: false,
   },
 ];
 
@@ -169,29 +211,38 @@ export const seedCandidates: Candidate[] = [
   {
     id: "CAN-801",
     name: "Jordan Clark",
+    email: "jordan.clark@example.com",
     role: "Motion Designer",
     source: "LinkedIn",
     stage: "interview",
     interviewDate: "2026-03-14",
     rating: 4,
+    offerLetterSentAt: null,
+    offerLetterFileName: null,
   },
   {
     id: "CAN-802",
     name: "Emma Rivera",
+    email: "emma.rivera@example.com",
     role: "SEO Analyst",
     source: "Referral",
     stage: "offer",
     interviewDate: "2026-03-13",
     rating: 5,
+    offerLetterSentAt: null,
+    offerLetterFileName: null,
   },
   {
     id: "CAN-803",
     name: "Noah Kim",
+    email: "noah.kim@example.com",
     role: "UI Engineer",
     source: "Indeed",
     stage: "sourced",
     interviewDate: "2026-03-19",
     rating: 3,
+    offerLetterSentAt: null,
+    offerLetterFileName: null,
   },
 ];
 
@@ -207,6 +258,8 @@ export const seedPayrollRecords: PayrollRecord[] = [
     deductions: 420,
     netPay: 8980,
     status: "processed",
+    payslipSentAt: null,
+    payslipFileName: null,
   },
   {
     id: "PAY-902",
@@ -219,6 +272,8 @@ export const seedPayrollRecords: PayrollRecord[] = [
     deductions: 330,
     netPay: 7070,
     status: "processed",
+    payslipSentAt: null,
+    payslipFileName: null,
   },
   {
     id: "PAY-903",
@@ -231,6 +286,76 @@ export const seedPayrollRecords: PayrollRecord[] = [
     deductions: 280,
     netPay: 6420,
     status: "scheduled",
+    payslipSentAt: null,
+    payslipFileName: null,
+  },
+];
+
+export const seedNotifications: Notification[] = [
+  {
+    id: "NOTIF-ADMIN-1",
+    role: "admin",
+    title: "Leave approvals waiting",
+    message: "Two leave requests are still pending review before the next weekly planning cycle.",
+    read: false,
+    createdAt: "2026-03-22T09:00:00.000Z",
+  },
+  {
+    id: "NOTIF-ADMIN-2",
+    role: "admin",
+    title: "Payroll batch ready",
+    message: "One scheduled payroll record is ready to be processed for the active month.",
+    read: false,
+    createdAt: "2026-03-22T07:45:00.000Z",
+  },
+  {
+    id: "NOTIF-EMP-1",
+    role: "employee",
+    title: "Attendance reminder",
+    message: "Remember to close out your day with a check-out stamp before leaving.",
+    read: false,
+    createdAt: "2026-03-22T08:10:00.000Z",
+  },
+  {
+    id: "NOTIF-EMP-2",
+    role: "employee",
+    title: "Payroll cycle updated",
+    message: "Latest payroll records are available in your workspace for review.",
+    read: false,
+    createdAt: "2026-03-21T16:30:00.000Z",
+  },
+];
+
+export const seedAnnouncements: Announcement[] = [
+  {
+    id: "ANN-ALL-1",
+    audience: "all",
+    title: "Workspace refresh is live",
+    message: "The HR CRM now includes a faster command bar, richer dashboards, and better operational visibility.",
+    tone: "info",
+    ctaLabel: "Open dashboard",
+    ctaPath: "/",
+    createdAt: "2026-03-22T06:00:00.000Z",
+  },
+  {
+    id: "ANN-ADMIN-1",
+    audience: "admin",
+    title: "Operations review window",
+    message: "Audit pending leave, blocked tasks, and scheduled payroll before closing this week's runbook.",
+    tone: "warning",
+    ctaLabel: "Review operations",
+    ctaPath: "/admin",
+    createdAt: "2026-03-22T06:30:00.000Z",
+  },
+  {
+    id: "ANN-EMP-1",
+    audience: "employee",
+    title: "Self-service workspace expanded",
+    message: "Use the upgraded dashboard to track attendance, leave requests, payroll, and active work from one view.",
+    tone: "success",
+    ctaLabel: "Open my workspace",
+    ctaPath: "/employee",
+    createdAt: "2026-03-22T06:45:00.000Z",
   },
 ];
 

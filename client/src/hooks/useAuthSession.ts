@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import type { UserProfile, UserRole } from "../types/auth";
 import { isSupabaseClientConfigured, supabase } from "../services/supabaseClient";
+import { clearLoginBroadcastStart, markLoginBroadcastStart } from "../utils/loginBroadcast";
 
 export interface AuthResult {
   success: boolean;
@@ -286,7 +287,15 @@ export function useAuthSession() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "SIGNED_IN") {
+        markLoginBroadcastStart();
+      }
+
+      if (event === "SIGNED_OUT") {
+        clearLoginBroadcastStart();
+      }
+
       void syncAuthState(nextSession);
     });
 

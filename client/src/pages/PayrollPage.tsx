@@ -4,6 +4,7 @@ import {
   BadgeDollarSign,
   Clock3,
   Download,
+  Mail,
   Plus,
   ReceiptText,
   RotateCcw,
@@ -20,7 +21,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useApi } from "../hooks/useApi";
 import { hrService } from "../services/hrService";
 import type { NewPayrollRecordPayload, PayrollRecord, PayrollStatus } from "../types/hr";
-import { formatCurrency } from "../utils/formatters";
+import { formatCurrency, formatDate } from "../utils/formatters";
 import { downloadCsv } from "../utils/fileExport";
 
 const initialPayrollForm: NewPayrollRecordPayload = {
@@ -66,9 +67,94 @@ function getNextMonthLabel(value: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(next);
 }
 
+const weekdayIndex: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
+
+function getMonthRange(value: string): { start: Date; end: Date } | null {
+  const date = parseMonthValue(value);
+  if (!date) {
+    return null;
+  }
+
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  return { start, end };
+}
+
+function countOverlapDays(startDate: string, endDate: string, rangeStart: Date, rangeEnd: Date): number {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  const overlapStart = start > rangeStart ? start : rangeStart;
+  const overlapEnd = end < rangeEnd ? end : rangeEnd;
+
+  if (Number.isNaN(overlapStart.valueOf()) || Number.isNaN(overlapEnd.valueOf())) {
+    return 0;
+  }
+
+  if (overlapEnd < overlapStart) {
+    return 0;
+  }
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  return Math.floor((overlapEnd.getTime() - overlapStart.getTime()) / dayMs) + 1;
+}
+
+function getWorkingDaysInMonth(value: string, workingDays: string[] | null | undefined): number | null {
+  const range = getMonthRange(value);
+  if (!range || !workingDays || workingDays.length === 0) {
+    return null;
+  }
+
+  const indices = new Set(
+    workingDays
+      .map((day) => weekdayIndex[day])
+      .filter((dayIndex) => typeof dayIndex === "number"),
+  );
+
+  if (indices.size === 0) {
+    return null;
+  }
+
+  let count = 0;
+  for (let cursor = new Date(range.start); cursor <= range.end; cursor.setDate(cursor.getDate() + 1)) {
+    if (indices.has(cursor.getDay())) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function formatDispatchSummary(
+  results: Array<{ employeeName: string; status: "sent" | "skipped" | "failed"; message: string }>,
+): string {
+  if (results.length === 0) {
+    return "No payslip emails were dispatched.";
+  }
+
+  const sentCount = results.filter((item) => item.status === "sent").length;
+  const skippedCount = results.filter((item) => item.status === "skipped").length;
+  const failedCount = results.filter((item) => item.status === "failed").length;
+  const lead = `${sentCount} sent, ${skippedCount} skipped, ${failedCount} failed.`;
+  const firstFailure = results.find((item) => item.status === "failed");
+
+  return firstFailure ? `${lead} First failure: ${firstFailure.employeeName} - ${firstFailure.message}` : lead;
+}
+
 export function PayrollPage() {
   const recordsHook = useApi(useCallback(() => hrService.getPayrollRecords(), []));
   const employeesHook = useApi(useCallback(() => hrService.getEmployees(), []));
+  const leavesHook = useApi(useCallback(() => hrService.getLeaveRequests(), []));
+  const settingsHook = useApi(useCallback(() => hrService.getSettings(), []));
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
@@ -83,6 +169,7 @@ export function PayrollPage() {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState<"status" | "delete" | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const records = useMemo(() => recordsHook.data ?? [], [recordsHook.data]);
   const employees = useMemo(() => employeesHook.data ?? [], [employeesHook.data]);
@@ -144,6 +231,91 @@ export function PayrollPage() {
     [records],
   );
 
+  const leaveSummary = useMemo(() => {
+    if (!formState.month || (!formState.employeeId && !formState.employeeName)) {
+      return null;
+    }
+
+    const range = getMonthRange(formState.month);
+    if (!range || !leavesHook.data) {
+      return null;
+    }
+
+    let eligibleDays = 0;
+    let compensatedDays = 0;
+
+    leavesHook.data.forEach((leave) => {
+      const matchesEmployee = formState.employeeId
+        ? leave.employeeId === formState.employeeId
+        : leave.employeeName === formState.employeeName;
+      if (!matchesEmployee || leave.status !== "approved") {
+        return;
+      }
+
+      const overlapDays = countOverlapDays(leave.startDate, leave.endDate, range.start, range.end);
+      if (overlapDays <= 0) {
+        return;
+      }
+
+      if (leave.compensated) {
+        compensatedDays += overlapDays;
+      } else {
+        eligibleDays += overlapDays;
+      }
+    });
+
+    const workingDaysInMonth = getWorkingDaysInMonth(formState.month, settingsHook.data?.workingDays);
+    const baseSalary = Number(formState.baseSalary) || 0;
+    const divisor = workingDaysInMonth && workingDaysInMonth > 0 ? workingDaysInMonth : 30;
+    const perDayRate = divisor > 0 ? baseSalary / divisor : 0;
+    const chargeableDays = Math.max(eligibleDays - 1, 0);
+    const deduction = eligibleDays > 1 ? perDayRate * chargeableDays : 0;
+
+    return {
+      eligibleDays,
+      compensatedDays,
+      totalDays: eligibleDays + compensatedDays,
+      chargeableDays,
+      perDayRate,
+      deduction,
+      workingDaysInMonth: workingDaysInMonth ?? 0,
+    };
+  }, [formState.baseSalary, formState.employeeId, formState.employeeName, formState.month, leavesHook.data, settingsHook.data?.workingDays]);
+
+  const computedDeductions = useMemo(
+    () => (leaveSummary ? Number(leaveSummary.deduction.toFixed(2)) : 0),
+    [leaveSummary],
+  );
+
+  const leaveDeductionNote = useMemo(() => {
+    if (leavesHook.loading) {
+      return "Calculating leave-based deductions...";
+    }
+
+    if (!formState.employeeId && !formState.employeeName) {
+      return "Select an employee to calculate leave deductions.";
+    }
+
+    if (!formState.month) {
+      return "Select a payroll month to calculate leave deductions.";
+    }
+
+    if (!leaveSummary) {
+      return "No leave data available for this selection.";
+    }
+
+    if (leaveSummary.totalDays === 0) {
+      return "No approved leave days in this month.";
+    }
+
+    const compensatedText = leaveSummary.compensatedDays > 0 ? `${leaveSummary.compensatedDays} compensated` : "0 compensated";
+    return `${leaveSummary.eligibleDays} eligible day(s), ${compensatedText}. Deductions apply after the first eligible day.`;
+  }, [formState.employeeId, formState.employeeName, formState.month, leaveSummary, leavesHook.loading]);
+
+  useEffect(() => {
+    setFormState((current) => (current.deductions === computedDeductions ? current : { ...current, deductions: computedDeductions }));
+  }, [computedDeductions]);
+
   const summary = useMemo(() => {
     return filteredRecords.reduce(
       (acc, row) => {
@@ -185,6 +357,53 @@ export function PayrollPage() {
     }
 
     setSelectedIds(filteredRecords.map((row) => row.id));
+  };
+
+  const handleDispatchPayslip = async (record: PayrollRecord) => {
+    setUpdatingPayrollId(record.id);
+    setUpdateError(null);
+    setActionMessage(null);
+
+    try {
+      const dispatch = await hrService.dispatchPayrollPayslip(record.id);
+      setActionMessage(
+        dispatch.status === "failed"
+          ? `Payslip delivery failed for ${record.employeeName}: ${dispatch.message}`
+          : `Payslip update for ${record.employeeName}: ${dispatch.message}`,
+      );
+      await recordsHook.refetch();
+    } catch (issue) {
+      setUpdateError(issue instanceof Error ? issue.message : "Unable to send payslip.");
+    } finally {
+      setUpdatingPayrollId(null);
+    }
+  };
+
+  const dispatchProcessedPayrolls = async (recordsToDispatch: PayrollRecord[]) => {
+    if (recordsToDispatch.length === 0) {
+      return;
+    }
+
+    const results = await Promise.all(
+      recordsToDispatch.map(async (record) => {
+        try {
+          const dispatch = await hrService.dispatchPayrollPayslip(record.id);
+          return {
+            employeeName: record.employeeName,
+            status: dispatch.status,
+            message: dispatch.message,
+          };
+        } catch (error) {
+          return {
+            employeeName: record.employeeName,
+            status: "failed" as const,
+            message: error instanceof Error ? error.message : "Unable to send payslip.",
+          };
+        }
+      }),
+    );
+
+    setActionMessage(`Payslip dispatch complete. ${formatDispatchSummary(results)}`);
   };
 
   const columns: Array<TableColumn<PayrollRecord>> = [
@@ -239,6 +458,18 @@ export function PayrollPage() {
     },
     { key: "status", header: "Status", render: (row) => <StatusBadge value={row.status} /> },
     {
+      key: "payslip",
+      header: "Payslip",
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-slate-950">
+            {row.payslipSentAt ? formatDate(row.payslipSentAt) : row.status === "processed" ? "Ready to send" : "Pending processing"}
+          </p>
+          <p className="text-xs text-slate-500">{row.payslipFileName ?? "No salary slip emailed yet."}</p>
+        </div>
+      ),
+    },
+    {
       key: "actions",
       header: "Actions",
       render: (row) => (
@@ -255,6 +486,17 @@ export function PayrollPage() {
           <button type="button" onClick={() => void handleDuplicateRecord(row)} className="btn-secondary px-3 py-2">
             Next cycle
           </button>
+          {row.status === "processed" ? (
+            <button
+              type="button"
+              onClick={() => void handleDispatchPayslip(row)}
+              disabled={updatingPayrollId === row.id}
+              className="btn-secondary px-3 py-2"
+            >
+              <Mail className="h-4 w-4" />
+              {updatingPayrollId === row.id ? "Sending..." : row.payslipSentAt ? "Resend slip" : "Send slip"}
+            </button>
+          ) : null}
           <button type="button" onClick={() => void handleDeleteRecord(row.id, row.employeeName)} className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white p-2 text-rose-700 transition hover:bg-rose-50">
             <Trash2 className="h-4 w-4" />
           </button>
@@ -264,6 +506,7 @@ export function PayrollPage() {
   ];
 
   const handleEmployeeSelect = (employeeId: string) => {
+    setActionMessage(null);
     if (!employeeId) {
       setFormState((current) => ({ ...current, employeeId: null, employeeName: "", department: "" }));
       setFormMessage(null);
@@ -291,6 +534,7 @@ export function PayrollPage() {
 
   const handleFormChange = (field: keyof NewPayrollRecordPayload, value: string) => {
     setFormMessage(null);
+    setActionMessage(null);
     setFormState((current) => ({
       ...current,
       [field]: ["baseSalary", "bonus", "deductions"].includes(field) ? Number(value) : value,
@@ -300,9 +544,20 @@ export function PayrollPage() {
   async function handleStatusChange(id: string, status: PayrollStatus) {
     setUpdatingPayrollId(id);
     setUpdateError(null);
+    setActionMessage(null);
 
     try {
-      await hrService.updatePayrollStatus(id, status);
+      const updatedRecord = await hrService.updatePayrollStatus(id, status);
+      if (status === "processed") {
+        const dispatch = await hrService.dispatchPayrollPayslip(id);
+        setActionMessage(
+          dispatch.status === "failed"
+            ? `Payroll processed for ${updatedRecord.employeeName}, but payslip delivery failed: ${dispatch.message}`
+            : `Payroll processed for ${updatedRecord.employeeName}. ${dispatch.message}`,
+        );
+      } else {
+        setActionMessage(`Payroll moved to ${status} for ${updatedRecord.employeeName}.`);
+      }
       await recordsHook.refetch();
     } catch (issue) {
       setUpdateError(issue instanceof Error ? issue.message : "Unable to update payroll status.");
@@ -318,9 +573,15 @@ export function PayrollPage() {
 
     setBulkLoading("status");
     setBulkError(null);
+    setActionMessage(null);
 
     try {
-      await hrService.bulkUpdatePayrollStatus(selectedIds, status);
+      const updatedRecords = await hrService.bulkUpdatePayrollStatus(selectedIds, status);
+      if (status === "processed") {
+        await dispatchProcessedPayrolls(updatedRecords);
+      } else {
+        setActionMessage(`${updatedRecords.length} payroll record(s) moved to ${status}.`);
+      }
       setSelectedIds([]);
       await recordsHook.refetch();
     } catch (issue) {
@@ -338,10 +599,12 @@ export function PayrollPage() {
 
     setUpdatingPayrollId(id);
     setUpdateError(null);
+    setActionMessage(null);
 
     try {
       await hrService.deletePayrollRecord(id);
       await recordsHook.refetch();
+      setActionMessage(`Payroll record removed for ${employeeName}.`);
     } catch (issue) {
       setUpdateError(issue instanceof Error ? issue.message : "Unable to delete payroll record.");
     } finally {
@@ -361,11 +624,13 @@ export function PayrollPage() {
 
     setBulkLoading("delete");
     setBulkError(null);
+    setActionMessage(null);
 
     try {
       await hrService.bulkDeletePayrollRecords(selectedIds);
       setSelectedIds([]);
       await recordsHook.refetch();
+      setActionMessage("Selected payroll records deleted.");
     } catch (issue) {
       setBulkError(issue instanceof Error ? issue.message : "Unable to bulk delete payroll records.");
     } finally {
@@ -388,6 +653,7 @@ export function PayrollPage() {
 
     setUpdatingPayrollId(record.id);
     setUpdateError(null);
+    setActionMessage(null);
 
     try {
       await hrService.createPayrollRecord({
@@ -401,7 +667,7 @@ export function PayrollPage() {
         status: "scheduled",
       });
       await recordsHook.refetch();
-      setFormMessage(`Next cycle draft created for ${record.employeeName} (${nextMonth}).`);
+      setActionMessage(`Next cycle draft created for ${record.employeeName} (${nextMonth}).`);
     } catch (issue) {
       setUpdateError(issue instanceof Error ? issue.message : "Unable to duplicate payroll record.");
     } finally {
@@ -413,14 +679,25 @@ export function PayrollPage() {
     event.preventDefault();
     setSubmitting(true);
     setSubmitError(null);
+    setActionMessage(null);
 
     try {
-      await hrService.createPayrollRecord({
+      const createdRecord = await hrService.createPayrollRecord({
         ...formState,
         month: formatMonthLabel(formState.month),
       });
       setFormState(initialPayrollForm);
-      setFormMessage("Payroll record created.");
+      if (createdRecord.status === "processed") {
+        const dispatch = await hrService.dispatchPayrollPayslip(createdRecord.id);
+        setActionMessage(
+          dispatch.status === "failed"
+            ? `Payroll record created for ${createdRecord.employeeName}, but payslip delivery failed: ${dispatch.message}`
+            : `Payroll record created for ${createdRecord.employeeName}. ${dispatch.message}`,
+        );
+      } else {
+        setActionMessage("Payroll record created.");
+      }
+      setFormMessage(null);
       await recordsHook.refetch();
     } catch (issue) {
       setSubmitError(issue instanceof Error ? issue.message : "Unable to create payroll record.");
@@ -487,6 +764,8 @@ export function PayrollPage() {
         chips={["Cycle control", "Queue review", "Draft autofill"]}
         spotlight={filteredRecords.length > 0 ? `${formatCurrency(summary.scheduledExposure)} scheduled exposure` : "Payroll workspace"}
       />
+
+      {actionMessage ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{actionMessage}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Visible net pay" value={formatCurrency(summary.totalNetPay)} hint="Current register scope" icon={Wallet} accent />
@@ -613,8 +892,9 @@ export function PayrollPage() {
               <div className="grid gap-3 sm:grid-cols-3">
                 <input type="number" min="0" value={formState.baseSalary} onChange={(event) => handleFormChange("baseSalary", event.target.value)} placeholder="Base" className="input-surface w-full" required />
                 <input type="number" min="0" value={formState.bonus} onChange={(event) => handleFormChange("bonus", event.target.value)} placeholder="Bonus" className="input-surface w-full" required />
-                <input type="number" min="0" value={formState.deductions} onChange={(event) => handleFormChange("deductions", event.target.value)} placeholder="Deductions" className="input-surface w-full" required />
+                <input type="number" min="0" value={formState.deductions} placeholder="Deductions" className="input-surface w-full" required readOnly />
               </div>
+              <p className="text-xs font-medium text-slate-500">{leaveDeductionNote}</p>
               <select value={formState.status} onChange={(event) => handleFormChange("status", event.target.value)} className="input-surface w-full">
                 <option value="scheduled">Scheduled</option>
                 <option value="processed">Processed</option>

@@ -16,7 +16,7 @@ export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
 
       <div className="relative border-b border-white/18 px-5 py-5">
         <div className="space-y-4">
-          <div className="rounded-[24px] border border-white/18 bg-white/10 px-4 py-3 shadow-[0_18px_45px_rgba(0,86,143,0.16)] backdrop-blur-sm">
+          <div className="rounded-[24px] border border-white/18 bg-white/12 px-4 py-3 shadow-[0_18px_45px_rgba(42,123,155,0.2)] backdrop-blur-sm">
             <BrandLogo size="md" variant="plain" />
           </div>
           <div className="px-1">

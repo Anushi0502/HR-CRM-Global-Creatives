@@ -17,11 +17,12 @@
   --brand-50: #f7fcff;
   --page-gradient: linear-gradient(
     135deg,
-    #ffffff 0%,
-    #f7fcff 18%,
-    #e9f7ff 42%,
-    #cfeeff 70%,
-    #0095ff 100%
+    #66a9f6 0%,
+    #86bcff 18%,
+    #a4ccff 38%,
+    #b4d4ff 62%,
+    #cadeff 82%,
+    #ffffff 100%
   );
 }
 

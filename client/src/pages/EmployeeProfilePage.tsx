@@ -1,5 +1,6 @@
-import { useCallback } from "react";
-import { Building2, CalendarClock, MapPin, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Building2, CalendarClock, Landmark, MapPin, Phone, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { EmployeePrivateDetailsForm } from "../components/EmployeePrivateDetailsForm";
 import { ModuleHero } from "../components/ModuleHero";
 import { NewUserSetupModal } from "../components/NewUserSetupModal";
 import { PageHeader } from "../components/PageHeader";
@@ -9,12 +10,30 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useApi } from "../hooks/useApi";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { hrService, isNewUserEmployeeSetupError } from "../services/hrService";
+import type { EmployeeProfileDetailsPayload } from "../types/hr";
 import { formatDate } from "../utils/formatters";
+import {
+  emptyEmployeeProfileDetails,
+  hasCompleteEmployeeProfileDetails,
+  toEmployeeProfileDetailsPayload,
+} from "../utils/employeeProfile";
 
 export function EmployeeProfilePage() {
   const { profile } = useAuthSession();
   const employeeHook = useApi(useCallback(() => hrService.getCurrentEmployee(), []));
   const settingsHook = useApi(useCallback(() => hrService.getSettings(), []));
+  const [detailsDraft, setDetailsDraft] = useState<EmployeeProfileDetailsPayload>(emptyEmployeeProfileDetails);
+  const [detailsSaving, setDetailsSaving] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [detailsMessage, setDetailsMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!employeeHook.data) {
+      return;
+    }
+
+    setDetailsDraft(toEmployeeProfileDetailsPayload(employeeHook.data));
+  }, [employeeHook.data]);
 
   if (employeeHook.loading) {
     return <p className="text-sm font-semibold text-brand-700">Loading profile...</p>;
@@ -29,6 +48,33 @@ export function EmployeeProfilePage() {
   }
 
   const employee = employeeHook.data;
+  const detailsComplete = hasCompleteEmployeeProfileDetails(employee);
+
+  const handleDetailsChange = (field: keyof EmployeeProfileDetailsPayload, value: string) => {
+    setDetailsError(null);
+    setDetailsMessage(null);
+    setDetailsDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveDetails = async () => {
+    setDetailsSaving(true);
+    setDetailsError(null);
+    setDetailsMessage(null);
+
+    try {
+      const updatedEmployee = await hrService.upsertMyProfileDetails(detailsDraft);
+      employeeHook.setData(updatedEmployee);
+      setDetailsDraft(toEmployeeProfileDetailsPayload(updatedEmployee));
+      setDetailsMessage("Profile details updated.");
+    } catch (error) {
+      setDetailsError(error instanceof Error ? error.message : "Unable to update profile details.");
+    } finally {
+      setDetailsSaving(false);
+    }
+  };
 
   return (
     <div className="animate-page-enter space-y-6">
@@ -110,6 +156,62 @@ export function EmployeeProfilePage() {
               </div>
             </div>
           ) : null}
+        </SectionCard>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <SectionCard
+          title="Private Details"
+          subtitle="Maintain payroll, banking, and compliance information used on salary slips"
+          rightSlot={
+            <span
+              className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] ${
+                detailsComplete ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {detailsComplete ? "Complete" : "Action needed"}
+            </span>
+          }
+        >
+          <EmployeePrivateDetailsForm
+            value={detailsDraft}
+            onChange={handleDetailsChange}
+            onSubmit={handleSaveDetails}
+            submitting={detailsSaving}
+            submitLabel="Save private details"
+            error={detailsError}
+            successMessage={detailsMessage}
+          />
+        </SectionCard>
+
+        <SectionCard title="Verification Snapshot" subtitle="Values currently stored against your employee record">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-brand-700">
+                <Phone className="h-3.5 w-3.5" />
+                Mobile
+              </p>
+              <p className="mt-2 text-sm font-semibold text-brand-900">{employee.mobile ?? "Pending update"}</p>
+            </div>
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-brand-700">
+                <Landmark className="h-3.5 w-3.5" />
+                Bank
+              </p>
+              <p className="mt-2 text-sm font-semibold text-brand-900">{employee.bankName ?? "Pending update"}</p>
+              <p className="mt-1 text-xs text-slate-500">{employee.bankAccountNumber ?? "Account number missing"}</p>
+            </div>
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-brand-700">PAN</p>
+              <p className="mt-2 text-sm font-semibold text-brand-900">{employee.pan ?? "Pending update"}</p>
+            </div>
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-brand-700">Address</p>
+              <p className="mt-2 text-sm font-semibold text-brand-900 whitespace-pre-line">
+                {employee.address ?? "Pending update"}
+              </p>
+            </div>
+          </div>
         </SectionCard>
       </div>
 

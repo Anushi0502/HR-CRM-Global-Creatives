@@ -87,7 +87,7 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-brand-50">
+      <div className="flex min-h-screen items-center justify-center px-4">
         <div className="rounded-xl border border-brand-200 bg-white px-5 py-3 text-sm font-semibold text-brand-700">
           Initializing secure session...
         </div>
