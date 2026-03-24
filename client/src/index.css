@@ -228,9 +228,10 @@ textarea {
 
   .input-surface {
     @apply rounded-lg border px-3 py-2 text-sm font-medium outline-none transition;
-    background-color: var(--input-bg);
+    background-color: var(--input-bg) !important;
     border-color: var(--input-border);
-    color: var(--input-text);
+    color: var(--input-text) !important;
+    caret-color: var(--input-text);
   }
 
   .input-surface::placeholder {
@@ -242,6 +243,19 @@ textarea {
   .input-surface:focus {
     border-color: var(--input-focus);
     box-shadow: 0 0 0 2px var(--input-ring);
+  }
+
+  input.input-surface:-webkit-autofill,
+  input.input-surface:-webkit-autofill:hover,
+  input.input-surface:-webkit-autofill:focus,
+  input.input-surface:-webkit-autofill:active,
+  input.input-surface:-moz-autofill,
+  input.input-surface:autofill {
+    -webkit-text-fill-color: var(--input-text) !important;
+    color: var(--input-text) !important;
+    caret-color: var(--input-text);
+    box-shadow: 0 0 0 1000px var(--input-bg) inset !important;
+    transition: background-color 9999s ease-in-out 0s;
   }
 
   .btn-primary {

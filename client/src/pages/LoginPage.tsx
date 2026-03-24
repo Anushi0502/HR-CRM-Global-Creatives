@@ -1,18 +1,6 @@
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import { useMemo, useState } from "react";
-import {
-  ArrowRight,
-  Building2,
-  CircleCheckBig,
-  Clock3,
-  Github,
-  LockKeyhole,
-  ShieldCheck,
-  Stars,
-  UserCheck2,
-  UserPlus,
-  WandSparkles,
-} from "lucide-react";
+import { ArrowRight, Github, LockKeyhole, ShieldCheck, UserPlus } from "lucide-react";
 import type { AuthResult } from "../hooks/useAuthSession";
 import { BrandLogo } from "../components/BrandLogo";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -52,7 +40,13 @@ export function LoginPage({
   onGoogleSignIn,
   isSupabaseConfigured,
 }: LoginPageProps) {
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [mode, setMode] = useState<AuthMode>(() => {
+    if (typeof window === "undefined") {
+      return "login";
+    }
+    const stored = window.localStorage.getItem("hrcrm_auth_mode");
+    return stored === "signup" ? "signup" : "login";
+  });
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -167,210 +161,191 @@ export function LoginPage({
         />
         <div className="absolute inset-x-0 bottom-0 h-[45%] bg-[radial-gradient(120%_90%_at_50%_100%,rgba(59,130,246,0.45),transparent_70%)]" />
       </div>
-      <div className="relative z-10 grid w-full max-w-7xl overflow-hidden rounded-[36px] border border-white/15 bg-slate-950/45 shadow-[0_40px_140px_-60px_rgba(2,8,23,0.9)] backdrop-blur-2xl lg:grid-cols-[1.08fr_0.92fr]">
-        <section className="relative hidden overflow-hidden px-8 py-10 text-white lg:block xl:px-10">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_30%)]" />
-
-          <div className="relative max-w-4xl">
-            <BrandLogo variant="plain" size="4xl" className="drop-shadow-[0_8px_24px_rgba(2,8,23,0.45)]" />
-            <p className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-1 text-[0.68rem] font-black uppercase tracking-[0.22em] text-white/90">
-              <Stars className="h-3.5 w-3.5" />
-              Global Creative Services HR CRM
-            </p>
-            <h1 className="mt-6 font-display text-5xl font-extrabold leading-[1.02] text-white">
-              Premium HR CRM access with a sharper operational shell.
-            </h1>
-            <p className="mt-4 max-w-lg text-base leading-relaxed text-white/90">
-              Sign in to the admin or employee workspace with secure Supabase auth, role-aware access, and faster day-to-day workflows.
-            </p>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/60">Access</p>
-                <p className="mt-2 text-2xl font-extrabold text-white">2</p>
-                <p className="mt-1 text-sm text-white/70">Admin + Employee workspaces</p>
-              </div>
-              <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/60">Auth</p>
-                <p className="mt-2 text-2xl font-extrabold text-white">OAuth</p>
-                <p className="mt-1 text-sm text-white/70">Google and GitHub ready</p>
-              </div>
-              <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/60">Security</p>
-                <p className="mt-2 text-2xl font-extrabold text-white">RLS</p>
-                <p className="mt-1 text-sm text-white/70">Role-aligned data visibility</p>
-              </div>
-            </div>
-
-            <div className="mt-8 rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-sm">
-              <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-white/85">
-                <WandSparkles className="h-3.5 w-3.5" />
-                Workspace Value
-              </p>
-              <ul className="mt-4 space-y-3 text-sm">
-                {[
-                  "Attendance, leave, payroll, and employee identity in one system.",
-                  "Role-scoped routes so the UI stays focused and safe.",
-                  "A cleaner shell aligned to the Global Creative visual tone.",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 rounded-2xl border border-white/8 bg-black/10 px-4 py-3">
-                    <CircleCheckBig className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
-                    <span className="text-white/90">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[24px] border border-white/12 bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] p-4">
-                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  <Building2 className="h-3.5 w-3.5" />
-                  Built for operations
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-slate-700">
-                  Designed for HR teams that need controlled access, fast navigation, and a more serious product surface.
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-white/12 bg-[linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] p-4">
-                <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  Faster daily flow
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-slate-700">
-                  Cleaner hierarchy reduces friction when employees check attendance and admins review live records.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
+      <div className="relative z-10 w-full max-w-6xl overflow-hidden rounded-[36px] border border-white/15 bg-slate-950/45 shadow-[0_40px_140px_-60px_rgba(2,8,23,0.9)] backdrop-blur-2xl">
         <section
           className="login-panel p-5 text-white sm:p-8 lg:p-10"
           style={{ backgroundImage: "var(--login-panel-gradient)" }}
         >
-          <div className="mx-auto max-w-xl rounded-[32px] border border-white/12 bg-slate-950/55 p-5 shadow-[0_28px_90px_-46px_rgba(10,15,36,0.8)] backdrop-blur-2xl sm:p-7">
-            <div className="mb-6 text-center lg:text-left">
-              <BrandLogo
-                size="lg"
-                containerClassName="mx-auto rounded-full border border-white/20 !bg-[linear-gradient(90deg,#1d4ed8_0%,#38bdf8_100%)] px-5 py-2.5 shadow-[0_12px_30px_-20px_rgba(56,189,248,0.35)] lg:mx-0"
-              />
-              <p className="mt-4 text-[0.68rem] font-black uppercase tracking-[0.22em] text-white/80">Global Creative Services</p>
-              <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight text-white sm:text-[2.4rem]">
-                {mode === "login" ? "Access your workspace" : "Create your workspace account"}
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-white/70">
-                {mode === "login"
-                  ? "Use your approved credentials or connected provider to enter the HR CRM."
-                  : "Register once, then continue into the role-aware HR workspace with secure access."}
-              </p>
-            </div>
+          <div className="grid items-stretch gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+            <aside className="relative flex h-full min-h-full flex-col justify-between gap-10 rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.35),rgba(2,6,23,0.35))] px-6 py-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:px-7">
+              <div className="flex-1 space-y-6">
+                <div className="relative w-full">
+                  <div className="absolute -inset-6 -z-10 rounded-[36px] bg-[radial-gradient(60%_60%_at_40%_40%,rgba(56,189,248,0.35),transparent_70%)] blur-2xl" />
+                  <div className="relative flex w-full items-center justify-center rounded-[28px] border border-white/20 bg-[linear-gradient(90deg,#1d4ed8_0%,#38bdf8_100%)] px-6 py-4 shadow-[0_24px_60px_-40px_rgba(56,189,248,0.9)] min-h-[84px] sm:min-h-[96px]">
+                    <BrandLogo variant="plain" size="4xl" className="drop-shadow-[0_10px_30px_rgba(2,8,23,0.55)]" />
+                  </div>
+                </div>
 
-            {!isSupabaseConfigured ? (
-              <div className="mb-4 rounded-2xl border border-amber-300/40 bg-amber-500/15 px-4 py-3 text-sm font-semibold text-amber-200">
-                Supabase is not configured in frontend environment variables.
+                <div className="space-y-3">
+                  <p className="text-[0.8rem] font-black uppercase tracking-[0.28em] text-sky-100">
+                    Workspace Access
+                  </p>
+                  <h1 className="font-display text-[3.6rem] font-extrabold leading-[1.04] text-white sm:text-[4.1rem]">
+                    {mode === "login" ? "Access your workspace" : "Create your workspace account"}
+                  </h1>
+                  <p className="max-w-md text-lg leading-relaxed text-white/90">
+                    {mode === "login"
+                      ? "Use your approved credentials or connected provider to enter the HR CRM."
+                      : "Register once, then continue into the role-aware HR workspace with secure access."}
+                  </p>
+                </div>
+
+                <div className="flex flex-nowrap items-center gap-2 text-[0.72rem] font-black uppercase tracking-[0.18em] text-white/90">
+                  {["Admin + Employee", "OAuth Ready", "Role-Aware"].map((item) => (
+                    <span
+                      key={item}
+                      className="whitespace-nowrap rounded-full border border-white/12 bg-white/6 px-2.5 py-1"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="h-px w-full rounded-full bg-gradient-to-r from-sky-300/60 via-transparent to-transparent" />
+            </aside>
+
+            <div className="lg:border-l lg:border-white/10 lg:pl-8 flex">
+              <div
+                className="w-full max-w-xl rounded-[32px] border border-white/12 bg-slate-950/55 p-5 shadow-[0_28px_90px_-46px_rgba(10,15,36,0.8)] backdrop-blur-2xl sm:p-7 h-full flex flex-col"
+                style={
+                  {
+                    "--input-bg": "#ffffff",
+                    "--input-border": "rgba(148,163,184,0.45)",
+                    "--input-text": "#0f172a",
+                    "--input-placeholder": "#64748b",
+                    "--input-focus": "#38bdf8",
+                    "--input-ring": "rgba(56,189,248,0.35)",
+                  } as CSSProperties
+                }
+              >
+                <div className="mb-4">
+                  <p className="text-[0.92rem] font-black uppercase tracking-[0.22em] text-white/85">
+                    {mode === "login" ? "Sign in" : "Sign up"}
+                  </p>
+                  <p className="mt-2 text-[1.18rem] leading-relaxed text-white/85">
+                    {mode === "login"
+                      ? "Use your credentials or a trusted provider."
+                      : "Create your account to continue into the workspace."}
+                  </p>
+                </div>
+
+                {!isSupabaseConfigured ? (
+                  <div className="mb-3 rounded-2xl border border-amber-300/40 bg-amber-500/15 px-4 py-3 text-base font-semibold text-amber-200">
+                    Supabase is not configured in frontend environment variables.
+                  </div>
+                ) : null}
+
+                <div className="mb-4 grid grid-cols-2 rounded-2xl border border-white/12 bg-white/8 p-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("login");
+                      window.localStorage.setItem("hrcrm_auth_mode", "login");
+                      setError(null);
+                      setInfo(null);
+                    }}
+                    className={`rounded-2xl px-4 py-3 text-[1.15rem] font-black transition ${
+                      mode === "login" ? "bg-white/20 text-slate-900 shadow-sm" : "text-slate-600"
+                    }`}
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("signup");
+                      window.localStorage.setItem("hrcrm_auth_mode", "signup");
+                      setError(null);
+                      setInfo(null);
+                    }}
+                    className={`rounded-2xl px-4 py-3 text-[1.15rem] font-black transition ${
+                      mode === "signup" ? "bg-white/20 text-slate-900 shadow-sm" : "text-slate-600"
+                    }`}
+                  >
+                    Sign up
+                  </button>
+                </div>
+
+            {mode === "login" ? (
+              <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  className="inline-flex w-full items-center justify-between gap-2 rounded-2xl border border-white/15 bg-white/12 px-4 py-3 text-[1.12rem] font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:bg-white/16 disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={() => void handleGoogleSignIn()}
+                  disabled={isSubmitting || !isSupabaseConfigured}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4" />
+                    Continue with Google
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex w-full items-center justify-between gap-2 rounded-2xl border border-white/25 bg-white/18 px-4 py-3 text-[1.12rem] font-bold text-slate-900 shadow-[0_14px_40px_-26px_rgba(56,189,248,0.65)] transition hover:-translate-y-0.5 hover:bg-white/22 disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={() => void handleGithubSignIn()}
+                  disabled={isSubmitting || !isSupabaseConfigured}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Github className="h-4 w-4" />
+                    Continue with GitHub
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+            ) : null}
+
+            {mode === "login" ? (
+              <div className="mb-3 flex items-center gap-3 text-[0.82rem] font-bold uppercase tracking-[0.22em] text-white/80">
+                <span className="h-px flex-1 bg-white/20" />
+                Secure email access
+                <span className="h-px flex-1 bg-white/20" />
               </div>
             ) : null}
 
-            <div className="mb-5 grid grid-cols-2 rounded-2xl border border-white/12 bg-white/8 p-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("login");
-                  setError(null);
-                  setInfo(null);
-                }}
-                className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
-                  mode === "login" ? "bg-white/20 text-slate-900 shadow-sm" : "text-slate-600"
-                }`}
-              >
-                Sign in
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signup");
-                  setError(null);
-                  setInfo(null);
-                }}
-                className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
-                  mode === "signup" ? "bg-white/20 text-slate-900 shadow-sm" : "text-slate-600"
-                }`}
-              >
-                Sign up
-              </button>
-            </div>
-
-            <div className="mb-5 grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                className="inline-flex w-full items-center justify-between gap-2 rounded-2xl border border-white/15 bg-white/12 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:bg-white/16 disabled:cursor-not-allowed disabled:opacity-70"
-                onClick={() => void handleGoogleSignIn()}
-                disabled={isSubmitting || !isSupabaseConfigured}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4" />
-                  Continue with Google
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="inline-flex w-full items-center justify-between gap-2 rounded-2xl border border-white/25 bg-white/18 px-4 py-3 text-sm font-bold text-slate-900 shadow-[0_14px_40px_-26px_rgba(56,189,248,0.65)] transition hover:-translate-y-0.5 hover:bg-white/22 disabled:cursor-not-allowed disabled:opacity-70"
-                onClick={() => void handleGithubSignIn()}
-                disabled={isSubmitting || !isSupabaseConfigured}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <Github className="h-4 w-4" />
-                  Continue with GitHub
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mb-5 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-white/50">
-              <span className="h-px flex-1 bg-white/20" />
-              Secure email access
-              <span className="h-px flex-1 bg-white/20" />
-            </div>
-
             {mode === "login" ? (
-              <form onSubmit={(event) => void handleLogin(event)} className="space-y-4">
+              <form onSubmit={(event) => void handleLogin(event)} className="space-y-3">
                 <div>
-                  <label htmlFor="login-email" className="mb-2 block text-[0.7rem] font-black uppercase tracking-[0.18em] text-sky-200">
+                  <label htmlFor="login-email" className="mb-1.5 block text-[0.86rem] font-black uppercase tracking-[0.2em] text-sky-100">
                     Email
                   </label>
                   <input
                     id="login-email"
                     type="email"
+                    name="email"
+                    autoComplete="username"
                     value={loginEmail}
                     onChange={(event) => setLoginEmail(event.target.value)}
-                    className="input-surface w-full"
+                    className="input-surface w-full px-4 py-3 text-[1.12rem]"
                     placeholder="name@company.com"
                     required
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="login-password" className="mb-2 block text-[0.7rem] font-black uppercase tracking-[0.18em] text-sky-200">
+                  <label htmlFor="login-password" className="mb-1.5 block text-[0.86rem] font-black uppercase tracking-[0.2em] text-sky-100">
                     Password
                   </label>
                   <input
                     id="login-password"
                     type="password"
+                    name="password"
+                    autoComplete="current-password"
                     value={loginPassword}
                     onChange={(event) => setLoginPassword(event.target.value)}
-                    className="input-surface w-full"
+                    className="input-surface w-full px-4 py-3 text-[1.12rem]"
                     placeholder="Enter your password"
                     required
                   />
                 </div>
 
-                {error ? <p className="rounded-2xl border border-rose-400/40 bg-rose-500/15 px-4 py-3 text-sm font-semibold text-rose-200">{error}</p> : null}
-                {info ? <p className="rounded-2xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-3 text-sm font-semibold text-emerald-200">{info}</p> : null}
+                {error ? <p className="rounded-2xl border border-rose-400/40 bg-rose-500/15 px-4 py-3 text-base font-semibold text-rose-200">{error}</p> : null}
+                {info ? <p className="rounded-2xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-3 text-base font-semibold text-emerald-200">{info}</p> : null}
 
                 <button
                   type="submit"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#1d4ed8_0%,#38bdf8_100%)] px-4 py-3 text-sm font-bold text-white shadow-[0_16px_40px_-26px_rgba(56,189,248,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#1d4ed8_0%,#38bdf8_100%)] px-4 py-3.5 text-[1.15rem] font-bold text-white shadow-[0_16px_40px_-26px_rgba(56,189,248,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isSubmitting || !isSupabaseConfigured}
                 >
                   <LockKeyhole className="h-4 w-4" />
@@ -378,82 +353,96 @@ export function LoginPage({
                 </button>
               </form>
             ) : (
-              <form onSubmit={(event) => void handleSignup(event)} className="space-y-4">
-                <div>
-                  <label htmlFor="signup-name" className="mb-2 block text-[0.7rem] font-black uppercase tracking-[0.18em] text-sky-200">
-                    Full name
-                  </label>
-                  <input
-                    id="signup-name"
-                    value={signupName}
-                    onChange={(event) => setSignupName(event.target.value)}
-                    className="input-surface w-full"
-                    placeholder="Jane Doe"
-                    required
-                  />
-                </div>
+              <form onSubmit={(event) => void handleSignup(event)} className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="signup-name" className="mb-1.5 block text-[0.86rem] font-black uppercase tracking-[0.2em] text-sky-100">
+                      Full name
+                    </label>
+                    <input
+                      id="signup-name"
+                      name="name"
+                      autoComplete="name"
+                      value={signupName}
+                      onChange={(event) => setSignupName(event.target.value)}
+                      className="input-surface w-full px-4 py-3 text-[1.12rem]"
+                      placeholder="Jane Doe"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <label htmlFor="signup-email" className="mb-2 block text-[0.7rem] font-black uppercase tracking-[0.18em] text-sky-200">
-                    Email
-                  </label>
-                  <input
-                    id="signup-email"
-                    type="email"
-                    value={signupEmail}
-                    onChange={(event) => setSignupEmail(event.target.value)}
-                    className="input-surface w-full"
-                    placeholder="name@company.com"
-                    required
-                  />
-                </div>
+                  <div>
+                    <label htmlFor="signup-email" className="mb-1.5 block text-[0.86rem] font-black uppercase tracking-[0.2em] text-sky-100">
+                      Email
+                    </label>
+                    <input
+                      id="signup-email"
+                      type="email"
+                      name="email"
+                      autoComplete="email"
+                      value={signupEmail}
+                      onChange={(event) => setSignupEmail(event.target.value)}
+                      className="input-surface w-full px-4 py-3 text-[1.12rem]"
+                      placeholder="name@company.com"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <label htmlFor="signup-password" className="mb-2 block text-[0.7rem] font-black uppercase tracking-[0.18em] text-sky-200">
-                    Password
-                  </label>
-                  <input
-                    id="signup-password"
-                    type="password"
-                    value={signupPassword}
-                    onChange={(event) => setSignupPassword(event.target.value)}
-                    className="input-surface w-full"
-                    placeholder="Create a strong password"
-                    required
-                  />
+                  <div>
+                    <label htmlFor="signup-password" className="mb-1.5 block text-[0.86rem] font-black uppercase tracking-[0.2em] text-sky-100">
+                      Password
+                    </label>
+                    <input
+                      id="signup-password"
+                      type="password"
+                      name="password"
+                      autoComplete="new-password"
+                      value={signupPassword}
+                      onChange={(event) => setSignupPassword(event.target.value)}
+                      className="input-surface w-full px-4 py-3 text-[1.12rem]"
+                      placeholder="Create a strong password"
+                      required
+                    />
+                  </div>
 
-                  <div className="mt-3 rounded-2xl border border-white/12 bg-white/8 p-3">
-                    <div className="h-2 rounded-full bg-white">
-                      <div
-                        className={`h-full rounded-full ${passwordStrength.tone}`}
-                        style={{ width: `${Math.max(passwordStrength.score * 100, 5)}%` }}
-                      />
+                  <div>
+                    <label htmlFor="signup-confirm-password" className="mb-1.5 block text-[0.86rem] font-black uppercase tracking-[0.2em] text-sky-100">
+                      Confirm password
+                    </label>
+                    <input
+                      id="signup-confirm-password"
+                      type="password"
+                      name="confirm-password"
+                      autoComplete="new-password"
+                      value={signupConfirmPassword}
+                      onChange={(event) => setSignupConfirmPassword(event.target.value)}
+                      className="input-surface w-full px-4 py-3 text-[1.12rem]"
+                      placeholder="Repeat your password"
+                      required
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <div className="mt-1 rounded-2xl border border-white/12 bg-white/8 px-4 py-3">
+                      <div className="h-2.5 w-full rounded-full bg-white/25">
+                        <div
+                          className={`h-full rounded-full ${passwordStrength.tone}`}
+                          style={{ width: `${Math.max(passwordStrength.score * 100, 5)}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-[0.9rem] font-semibold text-white/85">
+                        Password strength: {passwordStrength.label}
+                      </p>
                     </div>
-                    <p className="mt-2 text-xs font-semibold text-white/70">Password strength: {passwordStrength.label}</p>
                   </div>
                 </div>
 
-                <div>
-                  <label htmlFor="signup-confirm-password" className="mb-2 block text-[0.7rem] font-black uppercase tracking-[0.18em] text-sky-200">
-                    Confirm password
-                  </label>
-                  <input
-                    id="signup-confirm-password"
-                    type="password"
-                    value={signupConfirmPassword}
-                    onChange={(event) => setSignupConfirmPassword(event.target.value)}
-                    className="input-surface w-full"
-                    placeholder="Repeat your password"
-                    required
-                  />
-                </div>
-
-                {error ? <p className="rounded-2xl border border-rose-400/40 bg-rose-500/15 px-4 py-3 text-sm font-semibold text-rose-200">{error}</p> : null}
-                {info ? <p className="rounded-2xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-3 text-sm font-semibold text-emerald-200">{info}</p> : null}
+                {error ? <p className="rounded-2xl border border-rose-400/40 bg-rose-500/15 px-4 py-3 text-base font-semibold text-rose-200">{error}</p> : null}
+                {info ? <p className="rounded-2xl border border-emerald-300/40 bg-emerald-400/15 px-4 py-3 text-base font-semibold text-emerald-200">{info}</p> : null}
 
                 <button
                   type="submit"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#1d4ed8_0%,#38bdf8_100%)] px-4 py-3 text-sm font-bold text-white shadow-[0_16px_40px_-26px_rgba(56,189,248,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#1d4ed8_0%,#38bdf8_100%)] px-4 py-3.5 text-[1.15rem] font-bold text-white shadow-[0_16px_40px_-26px_rgba(56,189,248,0.7)] transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isSubmitting || !isSupabaseConfigured}
                 >
                   <UserPlus className="h-4 w-4" />
@@ -462,25 +451,6 @@ export function LoginPage({
               </form>
             )}
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-[24px] border border-white/12 bg-white/8 p-4">
-                <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-sky-200">Security Layer</p>
-                <p className="mt-2 text-sm font-medium leading-relaxed text-slate-700">
-                  Session-protected access with role-aware routing and Supabase-backed authentication across the CRM.
-                </p>
-                <button type="button" className="mt-3 inline-flex items-center gap-1 text-xs font-black uppercase tracking-[0.12em] text-slate-900">
-                  View security details
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="rounded-[24px] border border-white/12 bg-white/6 p-4">
-                <p className="inline-flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-sky-200">
-                  <UserCheck2 className="h-3.5 w-3.5" />
-                  Access note
-                </p>
-                <p className="mt-2 text-sm font-medium leading-relaxed text-slate-700">
-                  New users default to employee access unless elevated by HR admin in the CRM.
-                </p>
               </div>
             </div>
           </div>
