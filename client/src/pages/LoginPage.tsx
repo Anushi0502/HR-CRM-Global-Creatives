@@ -172,8 +172,8 @@ export function LoginPage({
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_30%)]" />
 
           <div className="relative max-w-4xl">
-            <BrandLogo variant="plain" size="4xl" />
-            <p className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-1 text-[0.68rem] font-black uppercase tracking-[0.22em] text-brand-100">
+            <BrandLogo variant="plain" size="4xl" className="drop-shadow-[0_8px_24px_rgba(2,8,23,0.45)]" />
+            <p className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/16 bg-white/10 px-3 py-1 text-[0.68rem] font-black uppercase tracking-[0.22em] text-white/90">
               <Stars className="h-3.5 w-3.5" />
               Global Creative Services HR CRM
             </p>
@@ -186,24 +186,24 @@ export function LoginPage({
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
               <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-slate-500">Access</p>
-                <p className="mt-2 text-2xl font-extrabold text-slate-900">2</p>
-                <p className="mt-1 text-sm text-slate-700">Admin + Employee workspaces</p>
+                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/60">Access</p>
+                <p className="mt-2 text-2xl font-extrabold text-white">2</p>
+                <p className="mt-1 text-sm text-white/70">Admin + Employee workspaces</p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-slate-500">Auth</p>
-                <p className="mt-2 text-2xl font-extrabold text-slate-900">OAuth</p>
-                <p className="mt-1 text-sm text-slate-700">Google and GitHub ready</p>
+                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/60">Auth</p>
+                <p className="mt-2 text-2xl font-extrabold text-white">OAuth</p>
+                <p className="mt-1 text-sm text-white/70">Google and GitHub ready</p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 p-4 backdrop-blur-sm">
-                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-slate-500">Security</p>
-                <p className="mt-2 text-2xl font-extrabold text-slate-900">RLS</p>
-                <p className="mt-1 text-sm text-slate-700">Role-aligned data visibility</p>
+                <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-white/60">Security</p>
+                <p className="mt-2 text-2xl font-extrabold text-white">RLS</p>
+                <p className="mt-1 text-sm text-white/70">Role-aligned data visibility</p>
               </div>
             </div>
 
             <div className="mt-8 rounded-[28px] border border-white/12 bg-white/[0.08] p-5 backdrop-blur-sm">
-              <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-brand-100">
+              <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-white/85">
                 <WandSparkles className="h-3.5 w-3.5" />
                 Workspace Value
               </p>
@@ -215,7 +215,7 @@ export function LoginPage({
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3 rounded-2xl border border-white/8 bg-black/10 px-4 py-3">
                     <CircleCheckBig className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
-                    <span className="text-slate-900">{item}</span>
+                    <span className="text-white/90">{item}</span>
                   </li>
                 ))}
               </ul>

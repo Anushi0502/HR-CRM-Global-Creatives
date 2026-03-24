@@ -2,7 +2,7 @@ import clsx from "clsx";
 import gcsLogo from "../assets/brand/gcs-logo.png";
 
 interface BrandLogoProps {
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "4xl";
   variant?: "gradient" | "plain";
   containerClassName?: string;
   className?: string;
@@ -13,6 +13,7 @@ const sizeMap = {
   md: "h-6 sm:h-7",
   lg: "h-7 sm:h-8",
   xl: "h-9 sm:h-10",
+  "4xl": "h-12 sm:h-14 lg:h-16",
 } satisfies Record<NonNullable<BrandLogoProps["size"]>, string>;
 
 export function BrandLogo({
