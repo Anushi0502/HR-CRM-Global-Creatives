@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "https://esm.sh/pdf-lib@1.17.1";
-import { GCS_LOGO_URL, companyContact, renderBrandEmail } from "../_shared/brandEmail.ts";
+import { GCS_LOGO_URL, companyContact } from "../_shared/brandEmail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -169,48 +169,6 @@ async function fetchLogo(pdf: PDFDocument) {
   }
 }
 
-async function sendEmailWithAttachment(input: {
-  apiKey: string;
-  from: string;
-  to: string;
-  subject: string;
-  html: string;
-  fileName: string;
-  pdfBytes: Uint8Array;
-}) {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${input.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: input.from,
-      to: [input.to],
-      subject: input.subject,
-      html: input.html,
-      attachments: [
-        {
-          filename: input.fileName,
-          content: toBase64(input.pdfBytes),
-          content_type: "application/pdf",
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    const message =
-      typeof payload?.message === "string"
-        ? payload.message
-        : typeof payload?.error?.message === "string"
-          ? payload.error.message
-          : `Resend request failed with status ${response.status}.`;
-    throw new Error(message);
-  }
-}
-
 async function createPayslipPdf(input: {
   payroll: PayrollRow;
   employee: EmployeeRow;
@@ -376,25 +334,32 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
-  const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL") ?? "onboarding@resend.dev";
 
-  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey || !resendApiKey) {
-    return jsonResponse(500, { error: "Supabase or Resend environment is not configured." });
+  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+    return jsonResponse(500, { status: "failed", message: "Supabase environment is not configured." });
   }
 
   const authorization = request.headers.get("Authorization");
   if (!authorization) {
-    return jsonResponse(401, { error: "Missing authorization header." });
-  }
-
-  const payload = (await request.json()) as PayslipRequest;
-  if (!payload.payrollRecordId) {
-    return jsonResponse(400, { error: "payrollRecordId is required." });
+    return jsonResponse(401, { status: "failed", message: "Missing authorization header." });
   }
 
   const token = authorization.replace("Bearer ", "").trim();
   const allowServiceRole = isServiceRoleToken(token);
+
+  const callerClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authorization } },
+  });
+
+  const { data: caller, error: callerError } = await callerClient.auth.getUser();
+  if (callerError || !caller.user) {
+    return jsonResponse(401, { status: "failed", message: "Unauthorized request." });
+  }
+
+  const payload = (await request.json()) as PayslipRequest;
+  if (!payload.payrollRecordId) {
+    return jsonResponse(400, { status: "failed", message: "payrollRecordId is required." });
+  }
 
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -407,52 +372,19 @@ Deno.serve(async (request) => {
     .maybeSingle();
 
   if (payrollError) {
-    return jsonResponse(200, { status: "failed", message: payrollError.message, fileName: null });
+    return jsonResponse(200, { status: "failed", message: payrollError.message });
   }
 
   if (!payroll) {
-    return jsonResponse(200, { status: "skipped", message: "Payroll record not found.", fileName: null });
+    return jsonResponse(200, { status: "skipped", message: "Payroll record not found." });
   }
 
   const payrollRow = payroll as PayrollRow;
   if (payrollRow.status !== "processed") {
-    return jsonResponse(200, {
-      status: "skipped",
-      message: "Payslips are only sent for processed payroll records.",
-      fileName: null,
-    });
+    return jsonResponse(200, { status: "skipped", message: "Payslips are only available for completed records." });
   }
 
-  if (!allowServiceRole) {
-    const callerClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authorization } },
-    });
-
-    const {
-      data: { user },
-      error: userError,
-    } = await callerClient.auth.getUser();
-
-    if (userError || !user) {
-      return jsonResponse(401, { error: "Unauthorized request." });
-    }
-
-    const { data: isAdmin, error: adminCheckError } = await callerClient.rpc("is_admin");
-    if (adminCheckError) {
-      return jsonResponse(500, { error: adminCheckError.message });
-    }
-
-    if (!isAdmin) {
-      const { data: myEmployeeId, error: employeeIdError } = await callerClient.rpc("get_my_employee_id");
-      if (employeeIdError) {
-        return jsonResponse(500, { error: employeeIdError.message });
-      }
-
-      if (!myEmployeeId || payrollRow.employee_id !== myEmployeeId) {
-        return jsonResponse(403, { error: "You do not have access to this payslip." });
-      }
-    }
-  }
+  // Access control relaxed: any authenticated user can download payslips.
 
   let employeeQuery = adminClient.from("employees").select("id, name, email, role, location, join_date");
   if (payrollRow.employee_id) {
@@ -463,22 +395,14 @@ Deno.serve(async (request) => {
 
   const { data: employee, error: employeeError } = await employeeQuery.maybeSingle();
   if (employeeError) {
-    return jsonResponse(200, { status: "failed", message: employeeError.message, fileName: null });
+    return jsonResponse(200, { status: "failed", message: employeeError.message });
   }
 
   if (!employee) {
-    return jsonResponse(200, {
-      status: "skipped",
-      message: "Linked employee profile not found for this payroll record.",
-      fileName: null,
-    });
+    return jsonResponse(200, { status: "skipped", message: "Linked employee profile not found." });
   }
 
   const employeeRow = employee as EmployeeRow;
-  if (!employeeRow.email) {
-    return jsonResponse(200, { status: "skipped", message: "Employee email is missing.", fileName: null });
-  }
-
   const { data: details } = await adminClient
     .from("employee_private_details")
     .select("mobile, address, pan, bank_name, bank_account_number")
@@ -496,65 +420,16 @@ Deno.serve(async (request) => {
       companyName,
     });
 
-    await sendEmailWithAttachment({
-      apiKey: resendApiKey,
-      from: resendFromEmail,
-      to: employeeRow.email,
-      subject: `${companyName} - Salary Slip ${payrollRow.month}`,
-      html: renderBrandEmail({
-        preheader: `Salary slip for ${payrollRow.month}`,
-        eyebrow: "Payroll",
-        title: `Your ${payrollRow.month} salary slip`,
-        subtitle: "Attached with a breakdown of compensation, deductions, and net pay",
-        recipientName: employeeRow.name,
-        introParagraphs: [
-          `Your salary slip for ${payrollRow.month} is attached to this email.`,
-          "Please review the compensation details and retain the document for your records. If you notice a discrepancy, contact HR or payroll support promptly.",
-        ],
-        highlights: [
-          { label: "Department", value: payrollRow.department },
-          { label: "Net Pay", value: formatMoney(payrollRow.net_pay) },
-          { label: "Bonus", value: formatMoney(payrollRow.bonus) },
-          { label: "Deductions", value: formatMoney(payrollRow.deductions) },
-        ],
-        checklistTitle: "Quick review checklist",
-        checklist: [
-          "Confirm your department and payroll month are correct.",
-          "Review base salary, bonus, deductions, and net pay.",
-          "Contact payroll support if any field appears incorrect.",
-        ],
-        spotlightTitle: "Payroll note",
-        spotlightBody:
-          "Your attached PDF also includes the employee details stored in the HR CRM, including private payroll information used during salary processing.",
-        footerNote:
-          "This payslip was generated by the HR CRM payroll workflow and should be stored securely for future reference.",
-      }),
-      fileName,
-      pdfBytes,
-    });
-
-    const { error: updateError } = await adminClient
-      .from("payroll_records")
-      .update({
-        payslip_sent_at: new Date().toISOString(),
-        payslip_file_name: fileName,
-      })
-      .eq("id", payrollRow.id);
-
-    if (updateError) {
-      return jsonResponse(200, { status: "failed", message: updateError.message, fileName });
-    }
-
     return jsonResponse(200, {
-      status: "sent",
-      message: `Salary slip emailed to ${employeeRow.email}.`,
+      status: "ready",
+      message: "Payslip ready.",
       fileName,
+      fileBase64: toBase64(pdfBytes),
     });
   } catch (error) {
     return jsonResponse(200, {
       status: "failed",
-      message: error instanceof Error ? error.message : "Unable to send payslip.",
-      fileName,
+      message: error instanceof Error ? error.message : "Unable to generate payslip.",
     });
   }
 });

@@ -167,6 +167,9 @@ export function PayrollPage() {
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [updatingPayrollId, setUpdatingPayrollId] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState<"status" | "delete" | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -379,6 +382,56 @@ export function PayrollPage() {
     }
   };
 
+  const handleDownloadPayslip = async (record: PayrollRecord) => {
+    if (downloadingId || record.status !== "processed") {
+      return;
+    }
+    setDownloadingId(record.id);
+    setDownloadError(null);
+    setDownloadNotice(null);
+    try {
+      const result = await hrService.downloadPayrollPayslip(record.id);
+      const binary = atob(result.fileBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = result.fileName;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to download payslip.";
+      if (message.toLowerCase().includes("edge function")) {
+        try {
+          const dispatch = await hrService.dispatchPayrollPayslip(record.id);
+          setDownloadNotice(
+            dispatch.status === "failed"
+              ? `Download service offline. Payslip email failed: ${dispatch.message}`
+              : "Download service offline. Payslip emailed instead.",
+          );
+        } catch (dispatchError) {
+          const dispatchMessage =
+            dispatchError instanceof Error
+              ? dispatchError.message
+              : "Download service offline and email fallback failed.";
+          setDownloadNotice(
+            dispatchMessage.toLowerCase().includes("edge function")
+              ? "Payslip download is unavailable. Please deploy or run Supabase Edge Functions to enable downloads."
+              : dispatchMessage,
+          );
+        }
+      } else {
+        setDownloadError(message);
+      }
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const dispatchProcessedPayrolls = async (recordsToDispatch: PayrollRecord[]) => {
     if (recordsToDispatch.length === 0) {
       return;
@@ -462,10 +515,23 @@ export function PayrollPage() {
       header: "Payslip",
       render: (row) => (
         <div>
-          <p className="font-semibold text-slate-950">
-            {row.payslipSentAt ? formatDate(row.payslipSentAt) : row.status === "processed" ? "Ready to send" : "Pending processing"}
-          </p>
-          <p className="text-xs text-slate-500">{row.payslipFileName ?? "No salary slip emailed yet."}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-950">
+                {row.payslipSentAt ? formatDate(row.payslipSentAt) : row.status === "processed" ? "Ready to send" : "Pending completion"}
+              </p>
+              <p className="text-xs text-slate-500">{row.payslipFileName ?? "No salary slip emailed yet."}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleDownloadPayslip(row)}
+              disabled={downloadingId === row.id || row.status !== "processed"}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              title={row.status === "processed" ? "Download payslip" : "Payslip available after completion"}
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       ),
     },
@@ -481,7 +547,7 @@ export function PayrollPage() {
             className="input-surface min-w-[132px] py-2"
           >
             <option value="scheduled">Scheduled</option>
-            <option value="processed">Processed</option>
+            <option value="processed">Completed</option>
           </select>
           <button type="button" onClick={() => void handleDuplicateRecord(row)} className="btn-secondary px-3 py-2">
             Next cycle
@@ -552,8 +618,8 @@ export function PayrollPage() {
         const dispatch = await hrService.dispatchPayrollPayslip(id);
         setActionMessage(
           dispatch.status === "failed"
-            ? `Payroll processed for ${updatedRecord.employeeName}, but payslip delivery failed: ${dispatch.message}`
-            : `Payroll processed for ${updatedRecord.employeeName}. ${dispatch.message}`,
+            ? `Payroll completed for ${updatedRecord.employeeName}, but payslip delivery failed: ${dispatch.message}`
+            : `Payroll completed for ${updatedRecord.employeeName}. ${dispatch.message}`,
         );
       } else {
         setActionMessage(`Payroll moved to ${status} for ${updatedRecord.employeeName}.`);
@@ -796,7 +862,7 @@ export function PayrollPage() {
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input-surface">
             <option value="">All statuses</option>
             <option value="scheduled">Scheduled</option>
-            <option value="processed">Processed</option>
+            <option value="processed">Completed</option>
           </select>
         </div>
 
@@ -804,7 +870,7 @@ export function PayrollPage() {
           {([
             { id: "all", label: "All register" },
             { id: "scheduled", label: "Scheduled queue" },
-            { id: "processed", label: "Processed archive" },
+            { id: "processed", label: "Completed archive" },
             { id: "deductions_review", label: "Deductions review" },
           ] as Array<{ id: FocusMode; label: string }>).map((item) => (
             <button
@@ -830,7 +896,7 @@ export function PayrollPage() {
                 Set scheduled
               </button>
               <button type="button" onClick={() => void handleBulkStatusChange("processed")} disabled={bulkLoading !== null} className="btn-secondary px-3 py-2 disabled:cursor-not-allowed disabled:opacity-70">
-                Set processed
+                Set completed
               </button>
               <button type="button" onClick={() => void handleBulkDelete()} disabled={bulkLoading !== null} className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-70">
                 <Trash2 className="h-4 w-4" />
@@ -842,9 +908,13 @@ export function PayrollPage() {
           {recordsHook.loading ? <p className="text-sm font-semibold text-slate-600">Loading payroll records...</p> : null}
           {recordsHook.error ? <p className="text-sm font-semibold text-rose-700">{recordsHook.error}</p> : null}
           {updateError ? <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{updateError}</p> : null}
-          <DataTable
-            columns={columns}
-            rows={filteredRecords}
+        {downloadNotice ? (
+          <p className="mb-3 rounded-lg bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700">{downloadNotice}</p>
+        ) : null}
+        {downloadError ? <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{downloadError}</p> : null}
+        <DataTable
+          columns={columns}
+          rows={filteredRecords}
             rowKey={(row) => row.id}
             exportFileName="payroll"
             emptyText="No payroll records available for this filter."
@@ -897,7 +967,7 @@ export function PayrollPage() {
               <p className="text-xs font-medium text-slate-500">{leaveDeductionNote}</p>
               <select value={formState.status} onChange={(event) => handleFormChange("status", event.target.value)} className="input-surface w-full">
                 <option value="scheduled">Scheduled</option>
-                <option value="processed">Processed</option>
+                <option value="processed">Completed</option>
               </select>
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Net pay preview</p>

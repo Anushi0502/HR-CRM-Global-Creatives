@@ -24,10 +24,12 @@ create table if not exists public.employees (
   manager text not null,
   status text not null check (status in ('active', 'on_leave', 'inactive')),
   performance_score integer not null check (performance_score >= 0 and performance_score <= 100),
+  avg_time_on_system_minutes integer not null default 0,
   created_at timestamptz not null default now()
 );
 
 alter table public.employees add column if not exists user_id uuid;
+alter table public.employees add column if not exists avg_time_on_system_minutes integer not null default 0;
 
 create table if not exists public.employee_private_details (
   employee_id text primary key references public.employees(id) on delete cascade,
@@ -48,8 +50,19 @@ create table if not exists public.attendance_records (
   check_in text not null,
   check_out text not null,
   status text not null check (status in ('present', 'late', 'remote', 'absent')),
+  check_in_at timestamptz,
+  check_out_at timestamptz,
+  break_minutes integer not null default 0,
+  time_on_system_minutes integer not null default 0,
+  break_summary jsonb,
   created_at timestamptz not null default now()
 );
+
+alter table public.attendance_records add column if not exists check_in_at timestamptz;
+alter table public.attendance_records add column if not exists check_out_at timestamptz;
+alter table public.attendance_records add column if not exists break_minutes integer not null default 0;
+alter table public.attendance_records add column if not exists time_on_system_minutes integer not null default 0;
+alter table public.attendance_records add column if not exists break_summary jsonb;
 
 create table if not exists public.leave_requests (
   id text primary key,
@@ -246,6 +259,121 @@ create trigger trg_employee_private_details_updated_at
 before update on public.employee_private_details
 for each row
 execute function public.sync_profile_updated_at();
+
+create or replace function public.sync_attendance_durations()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.check_in_at is not null and new.check_out_at is not null then
+    new.time_on_system_minutes := greatest(
+      0,
+      floor(extract(epoch from (new.check_out_at - new.check_in_at)) / 60) - coalesce(new.break_minutes, 0)
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_attendance_durations on public.attendance_records;
+create trigger trg_attendance_durations
+before insert or update on public.attendance_records
+for each row
+execute function public.sync_attendance_durations();
+
+create or replace function public.recalculate_employee_performance(p_employee_id text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_total integer := 0;
+  v_present integer := 0;
+  v_late integer := 0;
+  v_absent integer := 0;
+  v_avg_time numeric := 0;
+  v_expected_minutes integer := 540;
+  v_attendance_score numeric := 0;
+  v_time_score numeric := 0;
+  v_performance integer := 0;
+begin
+  select
+    count(*) filter (where status in ('present', 'remote')) as present_count,
+    count(*) filter (where status = 'late') as late_count,
+    count(*) filter (where status = 'absent') as absent_count,
+    count(*) as total_count,
+    avg(coalesce(time_on_system_minutes, 0)) as avg_time
+  into v_present, v_late, v_absent, v_total, v_avg_time
+  from public.attendance_records
+  where employee_id = p_employee_id
+    and date >= current_date - interval '30 days';
+
+  if v_total > 0 then
+    v_attendance_score := ((v_present + (0.6 * v_late)) / v_total) * 100;
+  else
+    v_attendance_score := 0;
+  end if;
+
+  select
+    greatest(
+      1,
+      floor(
+        extract(
+          epoch
+          from (
+            (btrim(split_part(work_hours, '-', 2))::time - btrim(split_part(work_hours, '-', 1))::time)
+          )
+        ) / 60
+      )
+    )
+  into v_expected_minutes
+  from public.crm_settings
+  limit 1;
+
+  v_time_score := least(100, greatest(0, (coalesce(v_avg_time, 0) / v_expected_minutes) * 100));
+  v_performance := round((0.6 * v_attendance_score) + (0.4 * v_time_score));
+
+  update public.employees
+  set
+    performance_score = v_performance,
+    avg_time_on_system_minutes = coalesce(round(v_avg_time), 0)
+  where id = p_employee_id;
+end;
+$$;
+
+create or replace function public.trg_attendance_recalc_employee()
+returns trigger
+language plpgsql
+as $$
+begin
+  perform public.recalculate_employee_performance(new.employee_id);
+  return new;
+end;
+$$;
+
+create or replace function public.trg_attendance_recalc_employee_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  perform public.recalculate_employee_performance(old.employee_id);
+  return old;
+end;
+$$;
+
+drop trigger if exists trg_attendance_recalc on public.attendance_records;
+create trigger trg_attendance_recalc
+after insert or update on public.attendance_records
+for each row
+execute function public.trg_attendance_recalc_employee();
+
+drop trigger if exists trg_attendance_recalc_delete on public.attendance_records;
+create trigger trg_attendance_recalc_delete
+after delete on public.attendance_records
+for each row
+execute function public.trg_attendance_recalc_employee_delete();
 
 create or replace function public.current_role()
 returns text

@@ -316,20 +316,6 @@ export function EmployeeDashboardPage() {
                 <p className="mt-2 text-3xl font-semibold text-slate-950">{formatCurrency(latestPayroll.netPay)}</p>
                 <p className="mt-1 text-sm text-slate-600">Status: {latestPayroll.status}</p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Base salary</p>
-                  <p className="mt-2 text-xl font-semibold text-slate-950">{formatCurrency(latestPayroll.baseSalary)}</p>
-                </div>
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Bonus</p>
-                  <p className="mt-2 text-xl font-semibold text-slate-950">{formatCurrency(latestPayroll.bonus)}</p>
-                </div>
-                <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Deductions</p>
-                  <p className="mt-2 text-xl font-semibold text-slate-950">{formatCurrency(latestPayroll.deductions)}</p>
-                </div>
-              </div>
             </div>
           ) : (
             <div className="rounded-[24px] border border-slate-200/80 bg-white/90 p-4 text-sm text-slate-600">

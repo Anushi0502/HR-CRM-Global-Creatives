@@ -22,6 +22,7 @@ Set frontend variables in `client/.env`:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY` (or `VITE_SUPABASE_PUBLISHABLE_KEY`)
+- `VITE_SUPABASE_FUNCTIONS_URL` (optional, override Edge Functions base URL)
 
 For admin bootstrap script, also set shell env vars:
 

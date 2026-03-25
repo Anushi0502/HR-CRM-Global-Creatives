@@ -4,7 +4,6 @@ import { AppMobileNav } from "../components/AppMobileNav";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppTopbar } from "../components/AppTopbar";
 import { EmployeePrivateDetailsForm } from "../components/EmployeePrivateDetailsForm";
-import { NotificationsPanel } from "../components/NotificationsPanel";
 import { QuickLinksFooter } from "../components/QuickLinksFooter";
 import { WorkspaceCommandPalette } from "../components/WorkspaceCommandPalette";
 import { hrService, isNewUserEmployeeSetupError } from "../services/hrService";
@@ -142,6 +141,10 @@ export function AppLayout({ onSignOut, items, workspaceLabel, userRole }: AppLay
     });
   };
 
+  const handleCloseNotifications = () => {
+    setShowNotifications(false);
+  };
+
   const shortcutItems = useMemo(
     () => {
       const navItems = items.filter((item) => !item.footerOnly);
@@ -243,22 +246,16 @@ export function AppLayout({ onSignOut, items, workspaceLabel, userRole }: AppLay
               items={items}
               workspaceLabel={workspaceLabel}
               onToggleNotifications={handleToggleNotifications}
-              onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+              onCloseNotifications={handleCloseNotifications}
+              notifications={notifications}
+              notificationsLoading={notificationsLoading}
+              notificationsError={notificationsError}
+              onMarkAllRead={handleMarkAllRead}
               unreadNotifications={unreadCount}
               notificationsOpen={showNotifications}
             />
           <main className="px-4 py-5 pb-24 md:px-6 md:py-6 lg:px-8 lg:pb-8">
             <div className="mx-auto w-full max-w-[1440px]">
-              {showNotifications ? (
-                <NotificationsPanel
-                  notifications={notifications}
-                  loading={notificationsLoading}
-                  error={notificationsError}
-                  unreadCount={unreadCount}
-                  onMarkAllRead={handleMarkAllRead}
-                  onClose={() => setShowNotifications(false)}
-                />
-              ) : null}
               <Outlet />
               <QuickLinksFooter items={items} />
             </div>

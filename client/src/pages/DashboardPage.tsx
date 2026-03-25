@@ -167,7 +167,7 @@ export function DashboardPage() {
           title="Payroll Total"
           value={formatCurrency(overview.metrics.payrollTotal)}
           icon={CircleDollarSign}
-          hint={`${command.payrollHealth.processedCount} processed this cycle`}
+          hint={`${command.payrollHealth.processedCount} completed this cycle`}
         />
       </div>
 
@@ -312,7 +312,7 @@ export function DashboardPage() {
                 <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(command.payrollHealth.highestNetPay)}</p>
               </div>
               <div className="rounded-[24px] border border-slate-200/80 bg-white/88 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Processed count</p>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Completed count</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-950">{command.payrollHealth.processedCount}</p>
               </div>
               <div className="rounded-[24px] border border-slate-200/80 bg-white/88 p-4">

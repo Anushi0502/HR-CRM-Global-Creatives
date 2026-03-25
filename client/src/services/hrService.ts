@@ -1,3 +1,4 @@
+import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/functions-js";
 import type {
   AdminCommandCenter,
   Announcement,
@@ -55,6 +56,7 @@ interface EmployeeRow {
   manager: string;
   status: Employee["status"];
   performance_score: number;
+  avg_time_on_system_minutes: number | null;
 }
 
 interface EmployeePrivateDetailsRow {
@@ -74,6 +76,11 @@ interface AttendanceRow {
   check_in: string;
   check_out: string;
   status: AttendanceRecord["status"];
+  check_in_at: string | null;
+  check_out_at: string | null;
+  break_minutes: number | null;
+  time_on_system_minutes: number | null;
+  break_summary: Record<string, number> | null;
 }
 
 interface LeaveRequestRow {
@@ -163,6 +170,13 @@ interface DocumentDispatchFunctionResponse {
   fileName?: string | null;
 }
 
+interface PayslipDownloadFunctionResponse {
+  status: "ready" | "failed" | "skipped";
+  message: string;
+  fileName?: string | null;
+  fileBase64?: string | null;
+}
+
 interface SettingsRow {
   id: number;
   company_name: string;
@@ -205,6 +219,78 @@ function isMissingTableError(message: string | undefined): boolean {
   return normalized.includes("does not exist") || normalized.includes("relation");
 }
 
+async function extractFunctionErrorMessage(response: Response | undefined): Promise<string | null> {
+  if (!response) {
+    return null;
+  }
+
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const text = await response.text().catch(() => "");
+  if (!text) {
+    return null;
+  }
+
+  if (contentType.includes("application/json")) {
+    try {
+      const payload = JSON.parse(text) as Record<string, unknown>;
+      if (typeof payload.message === "string") {
+        return payload.message;
+      }
+      if (typeof payload.error === "string") {
+        return payload.error;
+      }
+      if (typeof (payload.error as { message?: unknown } | undefined)?.message === "string") {
+        return (payload.error as { message: string }).message;
+      }
+    } catch {
+      // fall back to raw text
+    }
+  }
+
+  return text;
+}
+
+async function resolveFunctionError(functionName: string, error: unknown): Promise<Error> {
+  if (error instanceof FunctionsFetchError) {
+    return new Error(
+      `${functionName} failed because the Edge Function could not be reached. Deploy or run Supabase Edge Functions and ensure the functions URL is reachable from this browser.`,
+    );
+  }
+
+  if (error instanceof FunctionsHttpError || error instanceof FunctionsRelayError) {
+    const message = await extractFunctionErrorMessage(error.context);
+    if (message) {
+      return new Error(message);
+    }
+    const status = error.context?.status;
+    return new Error(
+      `Edge Function ${functionName} returned an error${status ? ` (status ${status})` : ""}.`,
+    );
+  }
+
+  return error instanceof Error ? error : new Error(`Unexpected error invoking ${functionName}.`);
+}
+
+async function invokeEdgeFunction<TResponse extends Record<string, unknown>>(
+  functionName: string,
+  body?: Record<string, unknown>,
+): Promise<TResponse> {
+  const client = assertSupabase();
+  const { data, error } = await client.functions.invoke<TResponse>(functionName, {
+    body,
+  });
+
+  if (error) {
+    throw await resolveFunctionError(functionName, error);
+  }
+
+  if (!data) {
+    throw new Error(`${functionName} returned no data.`);
+  }
+
+  return data;
+}
+
 async function fetchNotificationsTable(role: NotificationRole, table: "notifications" | "alerts") {
   const client = assertSupabase();
   const { data, error } = await client
@@ -241,30 +327,16 @@ async function sendEmployeeInvite(input: {
   fullName: string;
   role: string;
 }): Promise<EmployeeInviteResult> {
-  const client = assertSupabase();
   const redirectTo =
     typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
 
-  const { data, error } = await client.functions.invoke<InviteEmployeeFunctionResponse>(
-    "invite-employee",
-    {
-      body: {
-        employeeId: input.employeeId,
-        email: input.email,
-        fullName: input.fullName,
-        role: input.role,
-        redirectTo,
-      },
-    },
-  );
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
-    throw new Error("Invite function returned no data.");
-  }
+  const data = await invokeEdgeFunction<InviteEmployeeFunctionResponse>("invite-employee", {
+    employeeId: input.employeeId,
+    email: input.email,
+    fullName: input.fullName,
+    role: input.role,
+    redirectTo,
+  });
 
   return {
     status: data.status,
@@ -348,18 +420,7 @@ async function invokeDocumentDispatch<TBody extends Record<string, unknown>>(
   functionName: string,
   body: TBody,
 ): Promise<DocumentDispatchResult> {
-  const client = assertSupabase();
-  const { data, error } = await client.functions.invoke<DocumentDispatchFunctionResponse>(functionName, {
-    body,
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
-    throw new Error(`${functionName} returned no data.`);
-  }
+  const data = await invokeEdgeFunction<DocumentDispatchFunctionResponse>(functionName, body);
 
   return {
     status: data.status,
@@ -381,6 +442,7 @@ function toEmployee(row: EmployeeRow, details?: EmployeePrivateDetailsRow | null
     manager: row.manager,
     status: row.status,
     performanceScore: row.performance_score,
+    avgTimeOnSystemMinutes: row.avg_time_on_system_minutes ?? 0,
     mobile: details?.mobile ?? null,
     address: details?.address ?? null,
     pan: details?.pan ?? null,
@@ -398,6 +460,11 @@ function toAttendanceRecord(row: AttendanceRow): AttendanceRecord {
     checkIn: row.check_in,
     checkOut: row.check_out,
     status: row.status,
+    checkInAt: row.check_in_at,
+    checkOutAt: row.check_out_at,
+    breakMinutes: row.break_minutes ?? 0,
+    timeOnSystemMinutes: row.time_on_system_minutes ?? 0,
+    breakSummary: row.break_summary ?? null,
   };
 }
 
@@ -756,6 +823,7 @@ function buildFallbackEmployee(user: CurrentUserAuth, employeeId?: string): Empl
     manager: "HR Admin",
     status: "active",
     performanceScore: 80,
+    avgTimeOnSystemMinutes: 0,
     mobile: null,
     address: null,
     pan: null,
@@ -1156,6 +1224,7 @@ export const hrService = {
       manager: payload.manager,
       status: payload.status,
       performance_score: payload.performanceScore,
+      avg_time_on_system_minutes: 0,
     };
 
     const { data, error } = await client.from("employees").insert(row).select("*").single();
@@ -1294,12 +1363,29 @@ export const hrService = {
 
   updateAttendanceRecord: async (id: string, payload: UpdateAttendanceRecordPayload): Promise<AttendanceRecord> => {
     const client = assertSupabase();
+    const { data: existing, error: fetchError } = await client
+      .from("attendance_records")
+      .select("date")
+      .eq("id", id)
+      .single();
+    throwIfError(fetchError, "attendance record fetch");
+
+    const dateKey = existing?.date as string | undefined;
+    const toTimestamp = (value: string) => {
+      if (!dateKey || value === "--") {
+        return null;
+      }
+      return new Date(`${dateKey}T${value}:00`).toISOString();
+    };
+
     const { data, error } = await client
       .from("attendance_records")
       .update({
         check_in: payload.checkIn,
         check_out: payload.checkOut,
         status: payload.status,
+        check_in_at: toTimestamp(payload.checkIn),
+        check_out_at: toTimestamp(payload.checkOut),
       })
       .eq("id", id)
       .select("*")
@@ -1451,6 +1537,21 @@ export const hrService = {
 
   dispatchPayrollPayslip: async (payrollRecordId: string): Promise<DocumentDispatchResult> => {
     return invokeDocumentDispatch("send-payslip", { payrollRecordId });
+  },
+
+  downloadPayrollPayslip: async (payrollRecordId: string): Promise<{ fileName: string; fileBase64: string }> => {
+    const data = await invokeEdgeFunction<PayslipDownloadFunctionResponse>("download-payslip", {
+      payrollRecordId,
+    });
+
+    if (data.status !== "ready" || !data.fileBase64) {
+      throw new Error(data.message || "Payslip not ready for download.");
+    }
+
+    return {
+      fileName: data.fileName ?? "salary-slip.pdf",
+      fileBase64: data.fileBase64,
+    };
   },
 
   bulkUpdatePayrollStatus: async (ids: string[], status: PayrollRecord["status"]): Promise<PayrollRecord[]> => {
@@ -1887,6 +1988,7 @@ export const hrService = {
     const now = new Date();
     const today = getLocalDateKey(now);
     const currentTime = getLocalTimeLabel(now);
+    const currentTimestamp = now.toISOString();
     const todayRecord = await hrService.getMyTodayAttendance();
 
     if (todayRecord) {
@@ -1900,6 +2002,7 @@ export const hrService = {
         .update({
           status: nextStatus,
           check_in: todayRecord.checkIn === "--" ? currentTime : todayRecord.checkIn,
+          check_in_at: todayRecord.checkIn === "--" ? currentTimestamp : todayRecord.checkInAt ?? currentTimestamp,
         })
         .eq("id", todayRecord.id)
         .select("*")
@@ -1917,6 +2020,11 @@ export const hrService = {
       check_in: currentTime,
       check_out: "--",
       status: resolveAttendanceStatus(mode, now),
+      check_in_at: currentTimestamp,
+      check_out_at: null,
+      break_minutes: 0,
+      time_on_system_minutes: 0,
+      break_summary: null,
     };
 
     const { data, error } = await client.from("attendance_records").insert(row).select("*").single();
@@ -1940,7 +2048,9 @@ export const hrService = {
     return toAttendanceRecord(data as AttendanceRow);
   },
 
-  markMyCheckOut: async (): Promise<AttendanceRecord> => {
+  markMyCheckOut: async (
+    payload?: { breakMinutes?: number; breakSummary?: Record<string, number> | null },
+  ): Promise<AttendanceRecord> => {
     const client = assertSupabase();
     const todayRecord = await hrService.getMyTodayAttendance();
 
@@ -1952,9 +2062,15 @@ export const hrService = {
       return todayRecord;
     }
 
+    const breakMinutes = Math.max(0, Math.round(payload?.breakMinutes ?? todayRecord.breakMinutes ?? 0));
     const { data, error } = await client
       .from("attendance_records")
-      .update({ check_out: getLocalTimeLabel() })
+      .update({
+        check_out: getLocalTimeLabel(),
+        check_out_at: new Date().toISOString(),
+        break_minutes: breakMinutes,
+        break_summary: payload?.breakSummary ?? todayRecord.breakSummary ?? null,
+      })
       .eq("id", todayRecord.id)
       .select("*")
       .single();

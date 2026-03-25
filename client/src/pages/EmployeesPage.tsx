@@ -75,6 +75,15 @@ function formatTenure(dateValue: string): string {
   return `${(days / 365).toFixed(1)} yrs`;
 }
 
+function formatAverageTos(minutes: number): string {
+  if (!minutes || minutes <= 0) {
+    return "--";
+  }
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  return `${hours}h ${String(remaining).padStart(2, "0")}m`;
+}
+
 function getEmployeePriority(employee: Employee): "high" | "medium" | "normal" {
   if (employee.status === "inactive" || employee.performanceScore < 70) {
     return "high";
@@ -294,6 +303,16 @@ export function EmployeesPage() {
           <div className="mt-1 h-1.5 w-20 rounded-full bg-brand-100">
             <div className="h-full rounded-full bg-brand-600" style={{ width: `${row.performanceScore}%` }} />
           </div>
+        </div>
+      ),
+    },
+    {
+      key: "avg-tos",
+      header: "Avg time on system",
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-slate-900">{formatAverageTos(row.avgTimeOnSystemMinutes)}</p>
+          <p className="text-xs text-slate-500">Last 30 days avg</p>
         </div>
       ),
     },

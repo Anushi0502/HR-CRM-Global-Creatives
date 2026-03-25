@@ -59,6 +59,9 @@ const dotMap: Record<string, string> = {
 };
 
 function toLabel(value: string): string {
+  if (value === "processed") {
+    return "Completed";
+  }
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 

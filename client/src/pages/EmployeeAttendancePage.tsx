@@ -7,7 +7,6 @@ import {
   Home,
   LogOut,
   Sparkles,
-  SunMedium,
   TimerReset,
   UserRoundCheck,
   UserRoundX,
@@ -305,31 +304,7 @@ export function EmployeeAttendancePage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Smart Guidance" subtitle="Simple rules to keep your day clean and compliant">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">
-                <BadgeCheck className="h-3.5 w-3.5" />
-                First punch
-              </p>
-              <p className="mt-2 text-sm font-medium text-emerald-900">Mark attendance as soon as your workday starts so the log stays accurate.</p>
-            </div>
-            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
-              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-sky-700">
-                <Home className="h-3.5 w-3.5" />
-                Mode clarity
-              </p>
-              <p className="mt-2 text-sm font-medium text-sky-900">Switch between office and remote before check-out if your work mode changes mid-day.</p>
-            </div>
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-amber-700">
-                <SunMedium className="h-3.5 w-3.5" />
-                Close the loop
-              </p>
-              <p className="mt-2 text-sm font-medium text-amber-900">Always mark check-out before ending the day so your attendance line is fully closed.</p>
-            </div>
-          </div>
-        </SectionCard>
+        
       </div>
 
       <SectionCard title="Attendance Timeline" subtitle="Your recent attendance records">

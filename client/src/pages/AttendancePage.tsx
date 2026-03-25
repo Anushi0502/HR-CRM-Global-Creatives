@@ -53,6 +53,16 @@ function isExceptionRecord(record: AttendanceRecord): boolean {
   return record.status === "late" || record.status === "absent" || record.checkOut === "--";
 }
 
+function formatMinutes(value: number): string {
+  if (!value || value <= 0) {
+    return "--";
+  }
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${hours}:${pad(minutes)}`;
+}
+
 export function AttendancePage() {
   const recordsHook = useApi(useCallback(() => hrService.getAttendanceRecords(), []));
   const employeesHook = useApi(useCallback(() => hrService.getEmployees(), []));
@@ -244,6 +254,7 @@ export function AttendancePage() {
     { key: "date", header: "Date", render: (row) => formatDate(row.date) },
     { key: "check-in", header: "Check In", render: (row) => row.checkIn },
     { key: "check-out", header: "Check Out", render: (row) => row.checkOut },
+    { key: "time-on-system", header: "Time on system", render: (row) => formatMinutes(row.timeOnSystemMinutes) },
     { key: "status", header: "Status", render: (row) => <StatusBadge value={row.status} /> },
     {
       key: "actions",
@@ -319,13 +330,14 @@ export function AttendancePage() {
     downloadCsv(
       `attendance-${dateFilter}-${rangeMode}.csv`,
       [
-        ["Employee", "Department", "Date", "Check In", "Check Out", "Status"],
+        ["Employee", "Department", "Date", "Check In", "Check Out", "Time on system (min)", "Status"],
         ...filteredRecords.map((record) => [
           record.employeeName,
           employeeDepartmentMap.get(record.employeeId) ?? "Unassigned",
           record.date,
           record.checkIn,
           record.checkOut,
+          String(record.timeOnSystemMinutes ?? 0),
           record.status,
         ]),
       ],

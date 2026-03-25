@@ -36,6 +36,7 @@ export interface Employee {
   manager: string;
   status: EmployeeStatus;
   performanceScore: number;
+  avgTimeOnSystemMinutes: number;
   mobile: string | null;
   address: string | null;
   pan: string | null;
@@ -81,6 +82,11 @@ export interface AttendanceRecord {
   checkIn: string;
   checkOut: string;
   status: AttendanceStatus;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  breakMinutes: number;
+  timeOnSystemMinutes: number;
+  breakSummary?: Record<string, number> | null;
 }
 
 export type AttendanceCheckInMode = "office" | "remote";
