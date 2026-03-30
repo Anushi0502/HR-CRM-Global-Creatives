@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Clock3, LogOut, X } from "lucide-react";
+import { Bell, ChevronDown, Clock3, LogOut, Play, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { hrService } from "../services/hrService";
@@ -31,8 +31,8 @@ type BreakConfig = {
 type BreakState = Record<BreakKey, { totalMs: number; activeStart: number | null }>;
 
 const breakConfigs: BreakConfig[] = [
-  { key: "bio", label: "Bio", redAtMinutes: 15 },
-  { key: "lunch", label: "Lunch", redAtMinutes: 35 },
+  { key: "bio", label: "Freshen up break", redAtMinutes: 15 },
+  { key: "lunch", label: "Lunch break", redAtMinutes: 35 },
   { key: "tea", label: "Tea break", redAtMinutes: 20 },
   { key: "meetingTraining", label: "Meeting / Training" },
 ];
@@ -103,7 +103,9 @@ export function AppTopbar({
 }: AppTopbarProps) {
   const location = useLocation();
   const trackerRef = useRef<HTMLDivElement | null>(null);
+  const checkInRef = useRef<HTMLDivElement | null>(null);
   const alertsRef = useRef<HTMLDivElement | null>(null);
+  const lastProgressSyncRef = useRef(0);
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [timeLabel, setTimeLabel] = useState(() =>
@@ -122,6 +124,7 @@ export function AppTopbar({
   const [attendanceBusy, setAttendanceBusy] = useState(false);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
   const [breakMenuOpen, setBreakMenuOpen] = useState(false);
+  const [checkInMenuOpen, setCheckInMenuOpen] = useState(false);
 
   const currentTitle = useMemo(
     () => resolveCurrentTitle(location.pathname, items, workspaceLabel),
@@ -158,6 +161,9 @@ export function AppTopbar({
       if (trackerRef.current && !trackerRef.current.contains(target)) {
         setTrackerOpen(false);
       }
+      if (checkInRef.current && !checkInRef.current.contains(target)) {
+        setCheckInMenuOpen(false);
+      }
       if (alertsRef.current && !alertsRef.current.contains(target)) {
         onCloseNotifications?.();
       }
@@ -189,6 +195,8 @@ export function AppTopbar({
   const timeOnSystemMs = checkInAt ? Math.max(0, now - checkInAt - totalBreakMs) : 0;
   const checkedOut = Boolean(attendanceRecord && attendanceRecord.checkOut !== "--");
   const activeBreakLabel = activeBreak ? breakConfigs.find((config) => config.key === activeBreak)?.label : null;
+  const checkInDisabled = attendanceBusy || Boolean(checkInAt) || checkedOut;
+  const checkOutDisabled = attendanceBusy || !checkInAt;
 
   const getBreakElapsed = (key: BreakKey) => {
     const entry = breaks[key];
@@ -205,7 +213,62 @@ export function AppTopbar({
           : toCheckInTimestamp(record.checkIn)
         : null;
     setCheckInAt(nextCheckInAt);
+    if (record && record.checkOut === "--" && record.breakSummary) {
+      setBreaks(() => {
+        const next = createInitialBreaks();
+        breakConfigs.forEach((config) => {
+          const minutes = record.breakSummary?.[config.key] ?? 0;
+          next[config.key] = { totalMs: minutes * 60_000, activeStart: null };
+        });
+        return next;
+      });
+    }
   }, []);
+
+  const buildBreakSnapshot = useCallback((state: BreakState, timestamp: number) => {
+    const summary = breakConfigs.reduce<Record<string, number>>((acc, config) => {
+      const entry = state[config.key];
+      const activeMs = entry.activeStart ? timestamp - entry.activeStart : 0;
+      acc[config.key] = Math.round((entry.totalMs + activeMs) / 60000);
+      return acc;
+    }, {});
+    const breakMinutes = Object.values(summary).reduce((sum, value) => sum + (value ?? 0), 0);
+    return { breakMinutes, breakSummary: summary };
+  }, []);
+
+  const persistAttendanceProgress = useCallback(
+    async (snapshot: { breakMinutes: number; breakSummary: Record<string, number> }) => {
+      if (!checkInAt || attendanceBusy || !attendanceRecord || attendanceRecord.checkOut !== "--") {
+        return;
+      }
+      const existingTotal = attendanceRecord.breakSummary
+        ? Object.values(attendanceRecord.breakSummary).reduce((sum, value) => sum + (value ?? 0), 0)
+        : attendanceRecord.breakMinutes ?? 0;
+      if (existingTotal > 0 && snapshot.breakMinutes === 0) {
+        return;
+      }
+      const nowMs = Date.now();
+      if (nowMs - lastProgressSyncRef.current < 15_000) {
+        return;
+      }
+      lastProgressSyncRef.current = nowMs;
+      const timeOnSystemMinutes = Math.max(0, Math.round((nowMs - checkInAt) / 60000) - snapshot.breakMinutes);
+
+      try {
+        const record = await hrService.updateMyAttendanceProgress({
+          breakMinutes: snapshot.breakMinutes,
+          breakSummary: snapshot.breakSummary,
+          timeOnSystemMinutes,
+        });
+        if (record) {
+          applyAttendanceRecord(record);
+        }
+      } catch (error) {
+        // Silent fail: we still track breaks locally and will retry later.
+      }
+    },
+    [attendanceBusy, attendanceRecord, checkInAt, applyAttendanceRecord],
+  );
 
   const loadTodayAttendance = useCallback(async () => {
     try {
@@ -227,12 +290,28 @@ export function AppTopbar({
     }
   }, [trackerOpen]);
 
+  useEffect(() => {
+    if (!checkInAt || !attendanceRecord || attendanceRecord.checkOut !== "--") {
+      return;
+    }
+    const snapshot = buildBreakSnapshot(breaks, Date.now());
+    void persistAttendanceProgress(snapshot);
+  }, [attendanceRecord, breaks, buildBreakSnapshot, checkInAt, persistAttendanceProgress]);
+
+  const handleCheckInSelect = (mode: AttendanceCheckInMode) => {
+    setCheckInMenuOpen(false);
+    void handleCheckIn(mode);
+  };
+
   const handleCheckIn = async (mode: AttendanceCheckInMode) => {
     if (attendanceBusy) {
       return;
     }
     setAttendanceBusy(true);
     setAttendanceError(null);
+    setBreakMenuOpen(false);
+    setCheckInMenuOpen(false);
+    setTrackerOpen(false);
     try {
       const record = await hrService.markMyAttendance(mode);
       applyAttendanceRecord(record);
@@ -251,14 +330,19 @@ export function AppTopbar({
     }
     setAttendanceBusy(true);
     setAttendanceError(null);
+    setBreakMenuOpen(false);
+    setCheckInMenuOpen(false);
+    setTrackerOpen(false);
     try {
       const breakSummary = breakConfigs.reduce<Record<string, number>>((acc, config) => {
         acc[config.key] = Math.round(getBreakElapsed(config.key) / 60000);
         return acc;
       }, {});
+      const timeOnSystemMinutes = Math.max(0, Math.round(timeOnSystemMs / 60000));
       const record = await hrService.markMyCheckOut({
         breakMinutes: Math.round(totalBreakMs / 60000),
         breakSummary,
+        timeOnSystemMinutes,
       });
       applyAttendanceRecord(record);
       setActiveBreak(null);
@@ -315,44 +399,79 @@ export function AppTopbar({
     if (!activeBreak || activeBreak !== key) {
       setActiveBreak(key);
     }
+
+    setBreakMenuOpen(false);
+    setTrackerOpen(false);
   };
 
   return (
     <header className="app-topbar sticky top-0 z-20 border-b backdrop-blur-xl">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="min-w-0">
-            <p className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-brand-800">HR CRM Workspace</p>
-            <p className="truncate text-base font-semibold text-slate-950">{workspaceLabel}</p>
-            <p className="truncate text-sm font-medium text-slate-700">{currentTitle}</p>
-          </div>
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="hidden items-center gap-2 rounded-full border border-white/55 bg-white/68 px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.08)] md:inline-flex">
             <Clock3 className="h-4 w-4 text-brand-700" />
             {timeLabel}
           </div>
           <ThemeToggle className="hidden sm:inline-flex" />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div ref={checkInRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                if (checkInDisabled) return;
+                setCheckInMenuOpen((value) => !value);
+                setTrackerOpen(false);
+              }}
+              disabled={checkInDisabled}
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-600 bg-emerald-300 px-3 py-2 text-[0.65rem] font-black uppercase tracking-[0.18em] text-emerald-950 shadow-[0_10px_22px_rgba(5,150,105,0.26)] transition hover:brightness-105 disabled:opacity-60"
+            >
+              {checkInAt ? "Checked in" : checkedOut ? "Checked out" : "Check in"}
+              <ChevronDown className={`h-4 w-4 transition ${checkInMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+            {checkInMenuOpen ? (
+              <div className="absolute left-0 top-full z-30 mt-2 w-44 rounded-2xl border border-emerald-500 bg-emerald-200/95 p-2 shadow-[0_18px_40px_rgba(5,150,105,0.24)]">
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCheckInSelect("office")}
+                    className="rounded-xl border border-emerald-600 bg-emerald-300 px-3 py-2 text-left text-[0.65rem] font-black uppercase tracking-[0.18em] text-emerald-950 shadow-[0_8px_18px_rgba(5,150,105,0.26)]"
+                  >
+                    Check in office
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCheckInSelect("remote")}
+                    className="rounded-xl border border-emerald-600 bg-emerald-300 px-3 py-2 text-left text-[0.65rem] font-black uppercase tracking-[0.18em] text-emerald-950 shadow-[0_8px_18px_rgba(5,150,105,0.26)]"
+                  >
+                    Check in remote
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <div ref={trackerRef} className="relative">
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setTrackerOpen((value) => !value)}
-                className="time-tracker-trigger inline-flex items-center gap-2 rounded-full border border-brand-100 bg-[linear-gradient(135deg,#ffffff_0%,#eef6ff_55%,#ffffff_100%)] px-3 py-2 text-sm font-bold text-slate-800 shadow-[0_14px_30px_rgba(56,189,248,0.25)] transition hover:shadow-[0_18px_36px_rgba(56,189,248,0.3)] whitespace-nowrap"
+                onClick={() => {
+                  setTrackerOpen((value) => !value);
+                  setCheckInMenuOpen(false);
+                }}
+                className="time-tracker-trigger inline-flex items-center gap-2 rounded-full border border-brand-100 bg-[linear-gradient(135deg,#ffffff_0%,#eef6ff_55%,#ffffff_100%)] px-3 py-2 text-sm font-bold text-slate-900 shadow-[0_14px_30px_rgba(56,189,248,0.25)] transition hover:shadow-[0_18px_36px_rgba(56,189,248,0.3)] whitespace-nowrap dark:border-slate-700/60 dark:bg-[linear-gradient(135deg,#0b1224_0%,#1e293b_55%,#0f172a_100%)] dark:text-white"
               >
                 <Clock3 className="h-4 w-4 text-brand-700" />
                 {activeBreak ? (
                   <>
-                    <span className="text-xs font-black uppercase tracking-[0.2em] text-rose-600">Break</span>
-                    <span className="text-xs font-bold text-slate-700">{activeBreakLabel}</span>
-                    <span className="tabular-nums text-xs font-black text-slate-500">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{activeBreakLabel}</span>
+                    <span className="tabular-nums text-xs font-black text-slate-700 dark:text-slate-300">
                       {formatDuration(activeBreakElapsed)}
                     </span>
                   </>
                 ) : (
                   <>
-                    Time tracking
-                    <span className="tabular-nums text-xs font-black text-slate-500">
+                    Login hours
+                    <span className="tabular-nums text-xs font-black text-slate-700 dark:text-slate-300">
                       {checkInAt ? formatDuration(timeOnSystemMs) : "00:00"}
                     </span>
                   </>
@@ -363,129 +482,73 @@ export function AppTopbar({
                   type="button"
                   onClick={() => handleBreakToggle(activeBreak)}
                   className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-[0.65rem] font-black uppercase tracking-[0.18em] text-emerald-700 shadow-[0_10px_22px_rgba(16,185,129,0.18)] transition hover:brightness-105"
+                  aria-label="Resume"
                 >
-                  Resume
+                  <Play className="h-4 w-4" />
                 </button>
               ) : null}
             </div>
 
             {trackerOpen ? (
-              <div className="absolute right-0 top-full z-30 mt-3 w-[min(92vw,420px)]">
-                <div className="rounded-3xl border border-white/60 bg-white/95 p-4 text-slate-900 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur">
-                    <div className="time-tracker-divider flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-                      <div>
-                        <p className="time-tracker-eyebrow text-[0.78rem] font-black uppercase tracking-[0.26em] text-brand-700">
-                          Time tracking
-                        </p>
-                        <p className="time-tracker-desc mt-1 text-lg font-semibold text-slate-700">
-                          Start with check-in, then track breaks and end with checkout.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setTrackerOpen(false)}
-                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[0.65rem] font-black uppercase tracking-[0.18em] text-slate-500"
-                        >
-                          Esc
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTrackerOpen(false)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
-                          aria-label="Close time tracking"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 h-1 w-full rounded-full bg-[linear-gradient(90deg,#f59e0b,#38bdf8,#1d4ed8)]" />
-
-                    <div className="mt-4 grid gap-3">
-                      {checkInAt ? (
-                        <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-emerald-800 shadow-[0_10px_22px_rgba(16,185,129,0.18)]">
-                          <span>Checked in</span>
-                          <span className="text-[0.6rem] font-semibold tracking-[0.14em] text-emerald-700">Active shift</span>
-                        </div>
-                      ) : checkedOut ? (
-                        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-slate-500 shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
-                          <span>Checked out</span>
-                          <span className="text-[0.6rem] font-semibold tracking-[0.14em] text-slate-400">Shift closed</span>
-                        </div>
-                      ) : (
-                        <div className="grid gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleCheckIn("office")}
-                            disabled={attendanceBusy}
-                            className="w-full rounded-2xl border border-emerald-400 bg-[linear-gradient(135deg,#22c55e,#10b981)] px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-white shadow-[0_12px_26px_rgba(34,197,94,0.38)] transition hover:brightness-110 disabled:opacity-70"
-                          >
-                            Check in office
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleCheckIn("remote")}
-                            disabled={attendanceBusy}
-                            className="w-full rounded-2xl border border-emerald-300 bg-[linear-gradient(135deg,#4ade80,#22c55e)] px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_22px_rgba(34,197,94,0.32)] transition hover:brightness-110 disabled:opacity-70"
-                          >
-                            Check in remote
-                          </button>
-                        </div>
-                      )}
-
-                      <div className="time-tracker-pill flex w-full items-center justify-between rounded-2xl border border-amber-200/70 bg-[linear-gradient(135deg,#fef9c3,#e0f2fe)] px-4 py-2 shadow-[0_12px_26px_rgba(251,191,36,0.25)]">
-                        <span className="flex items-center gap-2">
-                          <Clock3 className="h-4 w-4 text-brand-700" />
-                          <span className="text-[0.6rem] font-black uppercase tracking-[0.2em] text-slate-500">
-                            Time on system
-                          </span>
-                        </span>
-                        <span className="time-tracker-pill-value tabular-nums text-lg font-black text-slate-900">
-                          {checkInAt ? formatDuration(timeOnSystemMs) : "00:00"}
-                        </span>
-                      </div>
-
+              <div className="absolute right-0 top-full z-30 mt-3 w-[280px] max-w-[90vw]">
+                <div className="rounded-3xl border border-white/50 bg-white/95 p-4 text-slate-900 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur max-h-[80vh] overflow-auto">
+                  <div className="time-tracker-divider flex items-center justify-end gap-2">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={handleCheckOut}
-                        disabled={!checkInAt || attendanceBusy}
-                        className={`w-full rounded-2xl border px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.18em] transition ${
-                          checkInAt
-                            ? "!border-red-600 !bg-red-600 text-white shadow-[0_12px_28px_rgba(239,68,68,0.45)] hover:brightness-110"
-                            : "!border-red-500 !bg-red-500 text-white shadow-[0_8px_20px_rgba(239,68,68,0.25)]"
-                        }`}
+                        onClick={() => setTrackerOpen(false)}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[0.65rem] font-black uppercase tracking-[0.18em] text-slate-500"
                       >
-                        Check out
+                        Esc
                       </button>
-                    </div>
-
-                    {attendanceError ? (
-                      <p className="mt-3 text-xs font-semibold text-rose-600">{attendanceError}</p>
-                    ) : null}
-
-                    <div className="mt-4">
                       <button
                         type="button"
-                        onClick={() => setBreakMenuOpen((value) => !value)}
-                        disabled={!checkInAt}
-                        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.2em] text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.08)] transition hover:shadow-[0_14px_26px_rgba(15,23,42,0.12)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                        onClick={() => setTrackerOpen(false)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                        aria-label="Close time tracking"
                       >
-                        <span>{activeBreakLabel ? `Break: ${activeBreakLabel}` : "Select break"}</span>
-                        <ChevronDown className={`h-4 w-4 transition ${breakMenuOpen ? "rotate-180" : ""}`} />
+                        <X className="h-4 w-4" />
                       </button>
-                      <span className={`mt-2 block text-xs font-semibold ${activeBreakLabel ? "text-amber-700" : "text-slate-500"}`}>
-                        {activeBreakLabel ? `Active: ${activeBreakLabel}` : "No active break"}
-                      </span>
+                    </div>
+                  </div>
 
-                      {breakMenuOpen ? (
-                        <div className="mt-3 grid gap-2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-[0_18px_40px_rgba(15,23,42,0.14)]">
+                  <div className="mt-4 h-1 w-full rounded-full bg-[linear-gradient(90deg,#f59e0b,#38bdf8,#1d4ed8)]" />
+
+                  {attendanceError ? (
+                    <p className="mt-3 text-xs font-semibold text-rose-600">{attendanceError}</p>
+                  ) : null}
+
+                  <div className="mt-4 relative">
+                    <button
+                      type="button"
+                      onClick={() => setBreakMenuOpen((value) => !value)}
+                      disabled={!checkInAt}
+                      className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.2em] text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.08)] transition hover:shadow-[0_14px_26px_rgba(15,23,42,0.12)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      <span>{activeBreakLabel ? `Break: ${activeBreakLabel}` : "Select break"}</span>
+                      <ChevronDown className={`h-4 w-4 transition ${breakMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    <span
+                      className={`mt-2 block text-xs font-semibold ${activeBreakLabel ? "text-amber-700" : "text-slate-500"}`}
+                    >
+                      {activeBreakLabel ? `Active: ${activeBreakLabel}` : "No active break"}
+                    </span>
+
+                    {breakMenuOpen ? (
+                      <div className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.14)] max-h-64 overflow-auto">
+                        <div className="flex flex-col gap-2">
                           {breakConfigs.map((config) => {
                             const elapsed = getBreakElapsed(config.key);
                             const isActive = activeBreak === config.key;
                             const overLimit =
                               config.redAtMinutes !== undefined && elapsed >= config.redAtMinutes * 60_000;
-                            const variant = !checkInAt ? "disabled" : overLimit ? "limit" : isActive ? "active" : "neutral";
+                            const variant = !checkInAt
+                              ? "disabled"
+                              : overLimit
+                                ? "limit"
+                                : isActive
+                                  ? "active"
+                                  : "neutral";
                             const stateClasses = !checkInAt
                               ? "border-slate-200 bg-slate-100 text-slate-400"
                               : overLimit
@@ -500,22 +563,31 @@ export function AppTopbar({
                                 type="button"
                                 onClick={() => handleBreakToggle(config.key)}
                                 disabled={!checkInAt}
-                                className={`time-tracker-break time-tracker-break--${variant} flex items-center justify-between rounded-2xl border px-4 py-2 text-[0.72rem] font-black uppercase tracking-[0.18em] transition ${stateClasses}`}
+                                className={`time-tracker-break time-tracker-break--${variant} flex flex-col items-start rounded-2xl border px-3 py-2 text-left text-[0.7rem] font-black uppercase tracking-[0.18em] transition ${stateClasses}`}
                               >
                                 <span>{config.label}</span>
-                                <span className="tabular-nums text-sm font-black tracking-normal">
+                                <span className="mt-1 text-xs font-semibold tracking-normal text-slate-500">
                                   {checkInAt ? formatDuration(elapsed) : "--:--"}
                                 </span>
                               </button>
                             );
                           })}
                         </div>
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ) : null}
           </div>
+          <button
+            type="button"
+            onClick={handleCheckOut}
+            disabled={checkOutDisabled}
+            className="rounded-full border border-rose-600 bg-rose-400 px-3 py-2 text-[0.65rem] font-black uppercase tracking-[0.18em] text-rose-950 shadow-[0_10px_22px_rgba(136,19,55,0.28)] transition hover:brightness-105 disabled:opacity-60"
+          >
+            Check out
+          </button>
           <div ref={alertsRef} className="relative">
             <button
               type="button"
@@ -536,15 +608,15 @@ export function AppTopbar({
             </button>
 
             {notificationsOpen ? (
-              <div className="absolute right-0 top-full z-30 mt-3 w-[min(92vw,360px)]">
-                <div className="rounded-3xl border border-white/50 bg-white/95 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur">
+              <div className="absolute right-0 top-full z-30 mt-3 w-[280px] max-w-[90vw]">
+                <div className="rounded-3xl border border-white/50 bg-white/95 p-3 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur max-h-[70vh] overflow-auto">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[0.65rem] font-black uppercase tracking-[0.22em] text-brand-700">
+                      <p className="text-[0.62rem] font-black uppercase tracking-[0.24em] text-brand-700">
                         Alerts
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-700">
-                        Stay on top of leave, payroll, and task updates.
+                      <p className="mt-1 text-xs font-semibold text-slate-700">
+                        Leave, payroll, and task updates.
                       </p>
                     </div>
                     <button
@@ -557,23 +629,23 @@ export function AppTopbar({
                     </button>
                   </div>
 
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => onMarkAllRead?.()}
                       disabled={unreadNotifications === 0}
-                      className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[0.6rem] font-black uppercase tracking-[0.25em] text-brand-900 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-full border border-brand-200 bg-brand-50 px-2 py-1 text-[0.55rem] font-black uppercase tracking-[0.22em] text-brand-900 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Mark all read
                     </button>
                     {unreadNotifications > 0 ? (
-                      <span className="rounded-full bg-emerald-500/12 px-3 py-1 text-[0.6rem] font-black uppercase tracking-[0.24em] text-emerald-700">
+                      <span className="rounded-full bg-emerald-500/12 px-2 py-1 text-[0.55rem] font-black uppercase tracking-[0.22em] text-emerald-700">
                         {unreadNotifications} new
                       </span>
                     ) : null}
                   </div>
 
-                  <div className="mt-3 grid max-h-72 gap-2 overflow-auto pr-1">
+                  <div className="mt-2 grid max-h-72 gap-2 overflow-auto pr-1">
                     {notificationsLoading ? (
                       <p className="text-xs font-semibold text-slate-500">Loading alerts...</p>
                     ) : null}
@@ -604,7 +676,7 @@ export function AppTopbar({
                             ) : null}
                           </div>
                           {timestamp ? (
-                            <p className="mt-2 text-[0.6rem] font-black uppercase tracking-[0.24em] text-slate-400">
+                            <p className="mt-2 text-[0.55rem] font-black uppercase tracking-[0.24em] text-slate-400">
                               {timestamp}
                             </p>
                           ) : null}

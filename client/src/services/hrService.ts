@@ -452,13 +452,17 @@ function toEmployee(row: EmployeeRow, details?: EmployeePrivateDetailsRow | null
 }
 
 function toAttendanceRecord(row: AttendanceRow): AttendanceRecord {
+  const normalizeTime = (value: string | null | undefined) => {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : "--";
+  };
   return {
     id: row.id,
     employeeId: row.employee_id,
     employeeName: row.employee_name,
     date: row.date,
-    checkIn: row.check_in,
-    checkOut: row.check_out,
+    checkIn: normalizeTime(row.check_in),
+    checkOut: normalizeTime(row.check_out),
     status: row.status,
     checkInAt: row.check_in_at,
     checkOutAt: row.check_out_at,
@@ -1845,6 +1849,46 @@ export const hrService = {
     return buildAttendanceSummary(records);
   },
 
+  getHolidayDatesForMonth: async (month: Date): Promise<string[]> => {
+    const client = assertSupabase();
+    const start = getLocalDateKey(new Date(month.getFullYear(), month.getMonth(), 1));
+    const end = getLocalDateKey(new Date(month.getFullYear(), month.getMonth() + 1, 0));
+
+    const extractDate = (row: Record<string, unknown>) => {
+      const candidate =
+        (row.date as string | undefined) ??
+        (row.holiday_date as string | undefined) ??
+        (row.holidayDate as string | undefined) ??
+        (row.day as string | undefined);
+      return typeof candidate === "string" ? candidate : null;
+    };
+
+    const tryFetch = async (table: string) => {
+      const { data, error } = await client.from(table).select("*");
+      if (error) {
+        throw error;
+      }
+      return (data ?? [])
+        .map((row) => extractDate(row as Record<string, unknown>))
+        .filter((value): value is string => Boolean(value))
+        .filter((value) => value >= start && value <= end);
+    };
+
+    const tables = ["company_holidays", "public_holidays", "holiday_calendar"];
+    for (const table of tables) {
+      try {
+        const dates = await tryFetch(table);
+        if (dates.length > 0) {
+          return dates;
+        }
+      } catch {
+        // Try next table if current one does not exist or errors out.
+      }
+    }
+
+    return [];
+  },
+
   getMyLeaveRequests: async (): Promise<LeaveRequest[]> => {
     const client = assertSupabase();
     const employee = await hrService.getCurrentEmployee();
@@ -1924,7 +1968,9 @@ export const hrService = {
       .sort((left, right) => new Date(left.startDate).valueOf() - new Date(right.startDate).valueOf())
       .slice(0, 3);
 
-    const nextPayrollMonth = payrollRecords[0]?.month ?? getNextPayrollCycleLabel(payrollRecords);
+    const latestProcessedPayroll = payrollRecords.find((record) => record.status === "processed") ?? null;
+    const payrollReference = latestProcessedPayroll ?? payrollRecords[0] ?? null;
+    const nextPayrollMonth = payrollReference?.month ?? getNextPayrollCycleLabel(payrollRecords);
     const attendanceStreak = calculateAttendanceStreak(attendanceRecords);
 
     const focusItems: PriorityItem[] = [
@@ -1958,15 +2004,15 @@ export const hrService = {
         id: "focus-payroll",
         title: "Payroll visibility",
         value: nextPayrollMonth ?? "No cycle yet",
-        meta: payrollRecords[0]
+        meta: payrollReference
           ? `Latest net pay ${new Intl.NumberFormat("en-US", {
               style: "currency",
               currency: "USD",
               maximumFractionDigits: 0,
-            }).format(payrollRecords[0].netPay)}.`
+            }).format(payrollReference.netPay)}.`
           : "Your latest payroll record will land here automatically.",
         route: "/employee/payroll",
-        tone: payrollRecords[0] ? "success" : "info",
+        tone: payrollReference?.status === "processed" ? "success" : payrollReference ? "warning" : "info",
       },
     ];
 
@@ -2048,8 +2094,49 @@ export const hrService = {
     return toAttendanceRecord(data as AttendanceRow);
   },
 
+  updateMyAttendanceProgress: async (payload: {
+    breakMinutes?: number;
+    breakSummary?: Record<string, number> | null;
+    timeOnSystemMinutes?: number;
+  }): Promise<AttendanceRecord | null> => {
+    const client = assertSupabase();
+    const todayRecord = await hrService.getMyTodayAttendance();
+
+    if (!todayRecord) {
+      return null;
+    }
+
+    if (todayRecord.checkOut !== "--") {
+      return todayRecord;
+    }
+
+    const breakMinutes = Math.max(0, Math.round(payload.breakMinutes ?? todayRecord.breakMinutes ?? 0));
+    const timeOnSystemMinutes = Math.max(
+      0,
+      Math.round(payload.timeOnSystemMinutes ?? todayRecord.timeOnSystemMinutes ?? 0),
+    );
+
+    const { data, error } = await client
+      .from("attendance_records")
+      .update({
+        break_minutes: breakMinutes,
+        break_summary: payload.breakSummary ?? todayRecord.breakSummary ?? null,
+        time_on_system_minutes: timeOnSystemMinutes,
+      })
+      .eq("id", todayRecord.id)
+      .select("*")
+      .single();
+
+    throwIfError(error, "attendance progress update");
+    return toAttendanceRecord(data as AttendanceRow);
+  },
+
   markMyCheckOut: async (
-    payload?: { breakMinutes?: number; breakSummary?: Record<string, number> | null },
+    payload?: {
+      breakMinutes?: number;
+      breakSummary?: Record<string, number> | null;
+      timeOnSystemMinutes?: number;
+    },
   ): Promise<AttendanceRecord> => {
     const client = assertSupabase();
     const todayRecord = await hrService.getMyTodayAttendance();
@@ -2063,6 +2150,10 @@ export const hrService = {
     }
 
     const breakMinutes = Math.max(0, Math.round(payload?.breakMinutes ?? todayRecord.breakMinutes ?? 0));
+    const timeOnSystemMinutes = Math.max(
+      0,
+      Math.round(payload?.timeOnSystemMinutes ?? todayRecord.timeOnSystemMinutes ?? 0),
+    );
     const { data, error } = await client
       .from("attendance_records")
       .update({
@@ -2070,6 +2161,7 @@ export const hrService = {
         check_out_at: new Date().toISOString(),
         break_minutes: breakMinutes,
         break_summary: payload?.breakSummary ?? todayRecord.breakSummary ?? null,
+        time_on_system_minutes: timeOnSystemMinutes,
       })
       .eq("id", todayRecord.id)
       .select("*")

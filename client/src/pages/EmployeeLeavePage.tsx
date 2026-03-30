@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { DataTable } from "../components/DataTable";
 import type { TableColumn } from "../components/DataTable";
-import { ModuleHero } from "../components/ModuleHero";
 import { NewUserSetupModal } from "../components/NewUserSetupModal";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
@@ -83,22 +82,14 @@ export function EmployeeLeavePage() {
     <div className="animate-page-enter space-y-6">
       <PageHeader
         title="My Leave"
-        subtitle="Submit new leave requests and track your approval status"
+        subtitle=""
         eyebrow="Employee Leave"
-      />
-
-      <ModuleHero
-        icon={CalendarClock}
-        title="Manage Leave Requests with Full Visibility"
-        subtitle="Plan ahead, keep your schedule clear, and push requests through a more polished self-service flow."
-        chips={["Request tracking", "Approval visibility", "Policy aligned"]}
-        spotlight={`${stats.pending} Pending`}
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Total" value={String(stats.total)} icon={CalendarClock} />
+        <StatCard title="Applied" value={String(stats.pending)} icon={CircleDashed} />
         <StatCard title="Approved" value={String(stats.approved)} icon={CircleCheckBig} />
-        <StatCard title="Pending" value={String(stats.pending)} icon={CircleDashed} />
         <StatCard title="Rejected" value={String(stats.rejected)} icon={CircleX} />
       </div>
 
@@ -111,9 +102,7 @@ export function EmployeeLeavePage() {
               Request Planner
             </p>
             <h2 className="mt-4 font-display text-3xl font-extrabold">Keep leave planning clear and low-friction</h2>
-            <p className="mt-2 max-w-2xl text-sm font-medium text-white/90">
-              Submit the request once, keep the reason concise, and monitor the approval state from the same screen.
-            </p>
+            
 
             <div className="mt-5 grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-white/12 bg-white/8 p-4">

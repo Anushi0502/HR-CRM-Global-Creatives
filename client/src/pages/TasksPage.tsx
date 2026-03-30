@@ -196,7 +196,6 @@ export function TasksPage() {
     <div className="animate-page-enter space-y-6">
       <PageHeader
         title="Task Command"
-        subtitle="Assign, track, and close operational tasks from a single queue."
         eyebrow="Task Center"
       />
 
@@ -208,7 +207,7 @@ export function TasksPage() {
       />
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1.8fr]">
-        <SectionCard title="Create Task" subtitle="Add a task to the operational queue">
+        <SectionCard title="Create Task">
           <div className="space-y-3">
             {employeesHook.error ? (
               <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
@@ -290,7 +289,7 @@ export function TasksPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Task Queue" subtitle="Monitor execution and progress updates">
+        <SectionCard title="Task Queue">
           {tasksHook.loading ? <p className="text-sm font-semibold text-brand-700">Loading tasks...</p> : null}
           {tasksHook.error ? <p className="text-sm font-semibold text-rose-700">{tasksHook.error}</p> : null}
           <DataTable

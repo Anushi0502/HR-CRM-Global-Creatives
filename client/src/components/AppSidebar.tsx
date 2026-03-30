@@ -20,7 +20,6 @@ export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
             <BrandLogo size="md" variant="plain" />
           </div>
           <div className="px-1">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/78">Workspace</p>
             <p className="text-lg font-bold text-white/78">{workspaceLabel}</p>
           </div>
         </div>

@@ -649,6 +649,10 @@ textarea {
     color: var(--text-slate-500) !important;
   }
 
+  :root[data-theme="light"] .segmented-control .segmented-active {
+    color: #ffffff !important;
+  }
+
   [class*="placeholder:text-slate-"]::placeholder,
   input::placeholder,
   textarea::placeholder {

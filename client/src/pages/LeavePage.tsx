@@ -25,6 +25,7 @@ export function LeavePage() {
 
   const stats = useMemo(() => {
     const list = leaveHook.data ?? [];
+    
 
     return {
       total: list.length,
@@ -267,7 +268,7 @@ export function LeavePage() {
           <input
             type="date"
             value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
+            noChange={(event) => setEndDate(event.target.value)}
             className="input-surface"
           />
         </div>

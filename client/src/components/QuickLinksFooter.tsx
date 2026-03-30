@@ -66,7 +66,7 @@ export function QuickLinksFooter({ items, title = defaultTitle, subtitle = defau
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
+          
         </div>
       </div>
 
