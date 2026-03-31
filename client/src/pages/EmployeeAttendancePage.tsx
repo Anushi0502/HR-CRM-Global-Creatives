@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BadgeCheck,
-  Building2,
-  CalendarRange,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -11,8 +8,6 @@ import {
   Clock3,
   Home,
   Info,
-  LogOut,
-  Sparkles,
   TimerReset,
   UserRoundCheck,
   UserRoundX,
@@ -21,7 +16,6 @@ import {
 } from "lucide-react";
 import { DataTable } from "../components/DataTable";
 import type { TableColumn } from "../components/DataTable";
-import { ModuleHero } from "../components/ModuleHero";
 import { NewUserSetupModal } from "../components/NewUserSetupModal";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
@@ -31,19 +25,10 @@ import { useApi } from "../hooks/useApi";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { hrService, isNewUserEmployeeSetupError } from "../services/hrService";
 import type { AttendanceRecord } from "../types/hr";
-import { formatDate, formatPercent, getLocalDateKey } from "../utils/formatters";
+import { formatDate, getLocalDateKey } from "../utils/formatters";
 
 export function EmployeeAttendancePage() {
   const { profile, signOut } = useAuthSession();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [nowLabel, setNowLabel] = useState(() =>
-    new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date()),
-  );
   const recordsHook = useApi(useCallback(() => hrService.getMyAttendanceRecords(), []));
   const todayKey = getLocalDateKey();
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -57,19 +42,6 @@ export function EmployeeAttendancePage() {
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      setNowLabel(
-        new Intl.DateTimeFormat("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-        }).format(new Date()),
-      );
-    }, 60_000);
-
-    return () => window.clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
       void recordsHook.refetch();
     }, 60_000);
     return () => window.clearInterval(interval);
@@ -79,21 +51,6 @@ export function EmployeeAttendancePage() {
     () => (recordsHook.data ?? []).find((row) => row.date === todayKey) ?? null,
     [recordsHook.data, todayKey],
   );
-
-  const checkedOut = Boolean(todayRecord?.checkOut && todayRecord.checkOut !== "--");
-  const todaySummaryLabel = todayRecord ? "Attendance locked in" : "Ready to start your day";
-  const todaySummaryText = todayRecord
-    ? `Check-in ${todayRecord.checkIn} and check-out ${todayRecord.checkOut}.`
-    : "Choose your work mode and record the first punch for today.";
-  const todayModeLabel =
-    todayRecord?.status === "remote"
-      ? "Remote mode"
-      : todayRecord?.status === "late"
-        ? "Late office entry"
-        : todayRecord?.status === "present"
-          ? "Office mode"
-          : "No mark yet";
-  const consistencyTone = "text-slate-600";
 
   const breakThresholdMinutes = 60;
   const breakPolicies = [
@@ -261,8 +218,6 @@ export function EmployeeAttendancePage() {
     };
   };
   const totalBreakMinutes = monthRecords.reduce((sum, record) => sum + getBreakMinutes(record), 0);
-  const breakIssueCount = monthRecords.filter((record) => getBreakExceedInfo(record).exceeds).length;
-
   type DayStatusKey =
     | "normal"
     | "late"
@@ -379,42 +334,6 @@ export function EmployeeAttendancePage() {
   if (isNewUserEmployeeSetupError(recordsHook.error)) {
     return <NewUserSetupModal email={profile?.email} onSignOut={() => void signOut()} />;
   }
-
-  const handleCheckIn = async (mode: "office" | "remote") => {
-    setActionError(null);
-    setActionMessage(null);
-    setIsSubmitting(true);
-
-    try {
-      const record = await hrService.markMyAttendance(mode);
-      setActionMessage(
-        mode === "remote"
-          ? `Remote attendance marked at ${record.checkIn}.`
-          : `Attendance marked at ${record.checkIn}.`,
-      );
-      await recordsHook.refetch();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to mark attendance.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCheckOut = async () => {
-    setActionError(null);
-    setActionMessage(null);
-    setIsSubmitting(true);
-
-    try {
-      const record = await hrService.markMyCheckOut();
-      setActionMessage(`Check out marked at ${record.checkOut}.`);
-      await recordsHook.refetch();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to mark check out.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div className="animate-page-enter space-y-6">

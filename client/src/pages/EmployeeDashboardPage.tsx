@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarClock, CircleDollarSign, ClipboardList, Clock3, Sparkles } from "lucide-react";
+import { CalendarClock, ClipboardList, Clock3 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AnnouncementStrip } from "../components/AnnouncementStrip";
 import { NewUserSetupModal } from "../components/NewUserSetupModal";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
 import { StatCard } from "../components/StatCard";
+import { StatusBadge } from "../components/StatusBadge";
 import { useApi } from "../hooks/useApi";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { hrService, isNewUserEmployeeSetupError } from "../services/hrService";
 import { getLoginBroadcastRemainingMs } from "../utils/loginBroadcast";
-import { formatCurrency, formatDate, formatPercent, getLocalDateKey } from "../utils/formatters";
+import { formatDate, formatPercent, getLocalDateKey } from "../utils/formatters";
 
 const focusTone: Record<string, string> = {
   info: "border-sky-200/80 bg-sky-50/80",
@@ -145,13 +146,6 @@ const polarToCartesian = (cx: number, cy: number, radius: number, angle: number)
   };
 };
 
-const describeArc = (cx: number, cy: number, radius: number, startAngle: number, endAngle: number) => {
-  const start = polarToCartesian(cx, cy, radius, endAngle);
-  const end = polarToCartesian(cx, cy, radius, startAngle);
-  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
-};
-
 const describeDonutSegment = (
   cx: number,
   cy: number,
@@ -243,7 +237,6 @@ export function EmployeeDashboardPage() {
 
   const latestPayroll = payrollHook.data?.[0] ?? null;
   const latestProcessedPayroll = payrollHook.data?.find((record) => record.status === "processed") ?? null;
-  const payrollReference = latestProcessedPayroll ?? latestPayroll;
   const pendingLeaveCount = (leaveHook.data ?? []).filter((row) => row.status === "pending").length;
   const command = commandHook.data;
   const greeting = useMemo(() => cleanGreeting(pickGreeting()), []);
@@ -314,15 +307,6 @@ export function EmployeeDashboardPage() {
     if (value.includes("payroll")) return performanceAspects[3];
     return null;
   };
-  const pieTotal = Math.max(1, performanceAspects.reduce((sum, aspect) => sum + aspect.score, 0));
-  let pieCursor = 0;
-  const pieSegments = performanceAspects.map((aspect) => {
-    const startAngle = -90 + (pieCursor / pieTotal) * 360;
-    pieCursor += aspect.score;
-    const endAngle = -90 + (pieCursor / pieTotal) * 360;
-    return { ...aspect, startAngle, endAngle };
-  });
-
   return (
     <div className="animate-page-enter space-y-6">
       <PageHeader

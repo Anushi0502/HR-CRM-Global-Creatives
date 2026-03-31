@@ -268,7 +268,7 @@ export function LeavePage() {
           <input
             type="date"
             value={endDate}
-            noChange={(event) => setEndDate(event.target.value)}
+            onChange={(event) => setEndDate(event.target.value)}
             className="input-surface"
           />
         </div>

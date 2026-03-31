@@ -405,7 +405,10 @@ export function AppTopbar({
   };
 
   return (
-    <header className="app-topbar sticky top-0 z-20 border-b backdrop-blur-xl">
+    <header
+      className="app-topbar sticky top-0 z-20 border-b backdrop-blur-xl"
+      aria-label={`${workspaceLabel} ${currentTitle}`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 lg:px-8">
         <div className="flex flex-wrap items-center gap-2">
           <div className="hidden items-center gap-2 rounded-full border border-white/55 bg-white/68 px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.08)] md:inline-flex">

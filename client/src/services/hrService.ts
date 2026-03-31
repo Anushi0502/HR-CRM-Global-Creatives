@@ -271,7 +271,7 @@ async function resolveFunctionError(functionName: string, error: unknown): Promi
   return error instanceof Error ? error : new Error(`Unexpected error invoking ${functionName}.`);
 }
 
-async function invokeEdgeFunction<TResponse extends Record<string, unknown>>(
+async function invokeEdgeFunction<TResponse>(
   functionName: string,
   body?: Record<string, unknown>,
 ): Promise<TResponse> {

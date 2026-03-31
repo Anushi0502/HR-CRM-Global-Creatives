@@ -4,7 +4,6 @@ import type { NavItem } from "../types/navigation";
 interface QuickLinksFooterProps {
   items: NavItem[];
   title?: string;
-  subtitle?: string;
 }
 
 const toneByLabel: Record<string, { tone: string; iconTone: string }> = {
@@ -51,9 +50,7 @@ const resolveTone = (label: string) => {
 };
 
 const defaultTitle = "Quick links";
-const defaultSubtitle = "Go straight to your tools";
-
-export function QuickLinksFooter({ items, title = defaultTitle, subtitle = defaultSubtitle }: QuickLinksFooterProps) {
+export function QuickLinksFooter({ items, title = defaultTitle }: QuickLinksFooterProps) {
   const location = useLocation();
   const footerItems = items.filter((item) => item.footerOnly);
   const quickItems = footerItems.length > 0 ? footerItems : items;
@@ -66,7 +63,6 @@ export function QuickLinksFooter({ items, title = defaultTitle, subtitle = defau
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          
         </div>
       </div>
 

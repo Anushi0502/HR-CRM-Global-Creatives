@@ -1,18 +1,12 @@
-import { CalendarDays, Info, Landmark, MinusCircle } from "lucide-react";
+import { CalendarDays, MinusCircle } from "lucide-react";
 import { calculatePayroll } from "../utils/payroll";
 import type { PayrollInput } from "../utils/payroll";
-import { formatCurrency } from "../utils/formatters";
 
 type PayrollCardProps = PayrollInput & {
   monthLabel: string;
   attendanceDays?: number;
   className?: string;
 };
-
-const formatDaysCopy = (payableDays: number, totalDays: number) =>
-  `You are paid for ${payableDays} days out of ${totalDays} days`;
-
-const formatMoney = (value: number) => formatCurrency(Number(value.toFixed(2)));
 
 export function PayrollCard({
   monthLabel,

@@ -196,6 +196,7 @@ export function TasksPage() {
     <div className="animate-page-enter space-y-6">
       <PageHeader
         title="Task Command"
+        subtitle=""
         eyebrow="Task Center"
       />
 
