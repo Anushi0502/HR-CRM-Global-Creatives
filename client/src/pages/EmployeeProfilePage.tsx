@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Building2, CalendarClock, Landmark, MapPin, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, CalendarClock, Landmark, MapPin, Phone, ShieldCheck } from "lucide-react";
 import { EmployeePrivateDetailsForm } from "../components/EmployeePrivateDetailsForm";
 import { NewUserSetupModal } from "../components/NewUserSetupModal";
 import { PageHeader } from "../components/PageHeader";
@@ -77,7 +77,7 @@ export function EmployeeProfilePage() {
 
   return (
     <div className="animate-page-enter space-y-6">
-      <PageHeader title="My Profile" eyebrow="Employee Profile" />
+      <PageHeader title="My Profile" subtitle="" eyebrow="Employee Profile" />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Department" value={employee.department} icon={Building2} />
