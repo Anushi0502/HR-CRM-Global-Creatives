@@ -72,8 +72,7 @@ export function StatusBadge({ value }: StatusBadgeProps) {
       className={clsx(
         "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold tracking-wide",
         toneMap[value] ?? "border-slate-200 bg-slate-100 text-slate-700",
-        highlight &&
-          "bg-emerald-100 text-emerald-900 border-emerald-300 ring-2 ring-emerald-300/80 shadow-[0_10px_22px_rgba(16,185,129,0.45)]",
+        highlight && "bg-white/85 text-brand-900 border-brand-200/80 ring-1 ring-brand-200/80 shadow-sm",
       )}
     >
       <span
