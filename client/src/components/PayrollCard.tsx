@@ -42,7 +42,6 @@ export function PayrollCard({
             <h2 className="text-3xl font-black leading-[1.08] tracking-[-0.02em] text-white drop-shadow-[0_14px_30px_rgba(15,23,42,0.38)] md:text-4xl lg:text-[2.6rem]">
               View your completed salary and breakdown
             </h2>
-            <div className="mt-3 h-1.5 w-40 rounded-full bg-gradient-to-r from-white/80 via-white/45 to-transparent shadow-[0_10px_26px_rgba(255,255,255,0.4)]" />
           </div>
           <div className="flex flex-col items-end gap-3 text-right">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[0.65rem] font-black uppercase tracking-[0.22em] text-white/85 shadow-[0_8px_30px_rgba(15,23,42,0.25)]">

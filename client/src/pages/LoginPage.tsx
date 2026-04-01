@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { ArrowRight, Github, LockKeyhole, ShieldCheck, UserPlus } from "lucide-react";
 import type { AuthResult } from "../hooks/useAuthSession";
 import { BrandLogo } from "../components/BrandLogo";
-import { ThemeToggle } from "../components/ThemeToggle";
 
 interface LoginPageProps {
   onLogin: (email: string, password: string) => Promise<AuthResult>;
@@ -140,9 +139,6 @@ export function LoginPage({
 
   return (
     <div className="relative flex min-h-screen animate-page-enter items-center justify-center overflow-hidden bg-transparent px-4 py-8 sm:px-6 lg:px-8">
-      <div className="absolute right-6 top-6 z-20">
-        <ThemeToggle />
-      </div>
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_70%_45%,rgba(56,189,248,0.35),transparent_70%),radial-gradient(1000px_520px_at_18%_18%,rgba(14,116,255,0.28),transparent_65%),radial-gradient(900px_540px_at_85%_80%,rgba(59,130,246,0.22),transparent_72%)]" />
         <div

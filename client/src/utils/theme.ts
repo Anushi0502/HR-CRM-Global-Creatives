@@ -6,10 +6,10 @@ const isThemeMode = (value: string | null): value is ThemeMode => value === "lig
 
 export const getCurrentTheme = (): ThemeMode => {
   if (typeof document === "undefined") {
-    return "dark";
+    return "light";
   }
   const theme = document.documentElement.dataset.theme;
-  return theme === "light" ? "light" : "dark";
+  return theme === "dark" ? "dark" : "light";
 };
 
 export const applyTheme = (mode: ThemeMode) => {
@@ -28,12 +28,11 @@ export const initTheme = () => {
     return;
   }
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  const mode: ThemeMode = isThemeMode(stored) ? stored : "dark";
+  const mode: ThemeMode = isThemeMode(stored) && stored === "dark" ? "light" : "light";
   applyTheme(mode);
 };
 
 export const toggleTheme = (): ThemeMode => {
-  const next = getCurrentTheme() === "dark" ? "light" : "dark";
-  applyTheme(next);
-  return next;
+  applyTheme("light");
+  return "light";
 };

@@ -5,7 +5,7 @@ interface StatusBadgeProps {
 }
 
 const toneMap: Record<string, string> = {
-  active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  active: "border-emerald-200 bg-white/85 text-emerald-700",
   on_leave: "border-amber-200 bg-amber-50 text-amber-700",
   inactive: "border-slate-200 bg-slate-100 text-slate-700",
   present: "border-emerald-200 bg-emerald-50 text-emerald-700",
