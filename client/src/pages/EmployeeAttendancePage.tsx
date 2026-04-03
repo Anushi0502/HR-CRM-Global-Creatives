@@ -36,6 +36,7 @@ export function EmployeeAttendancePage() {
   const [modeFilter, setModeFilter] = useState<"all" | "office" | "remote">("all");
   const [showLateOnly, setShowLateOnly] = useState(false);
   const [showBreakOnly, setShowBreakOnly] = useState(false);
+  const [liveBreak, setLiveBreak] = useState<{ key: BreakKey; startedAt: number } | null>(null);
   const holidayHook = useApi(
     useCallback(() => hrService.getHolidayDatesForMonth(calendarMonth), [calendarMonth]),
   );
@@ -46,6 +47,32 @@ export function EmployeeAttendancePage() {
     }, 60_000);
     return () => window.clearInterval(interval);
   }, [recordsHook]);
+
+  useEffect(() => {
+    const readLiveBreak = () => {
+      try {
+        const raw = window.localStorage.getItem("gcs-live-break");
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as { key?: BreakKey; startedAt?: number };
+        if (!parsed.key || !parsed.startedAt) return null;
+        return { key: parsed.key, startedAt: parsed.startedAt };
+      } catch {
+        return null;
+      }
+    };
+
+    setLiveBreak(readLiveBreak());
+    const interval = window.setInterval(() => {
+      setLiveBreak(readLiveBreak());
+    }, 1_000);
+
+    const handleStorage = () => setLiveBreak(readLiveBreak());
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
 
   const breakThresholdMinutes = 60;
   const breakPolicies = [
@@ -156,9 +183,12 @@ export function EmployeeAttendancePage() {
     value
       .replace(/_/g, " ")
       .replace(/\b\w/g, (match) => match.toUpperCase());
-  const getBreakBreakdown = (record?: AttendanceRecord | null) => {
-    if (!record) return [];
-    const summary = record.breakSummary ?? null;
+  const getBreakBreakdown = (
+    record?: AttendanceRecord | null,
+    liveOverride?: { key: BreakKey; minutes: number } | null,
+  ) => {
+    if (!record && !liveOverride) return [];
+    const summary = record?.breakSummary ?? null;
     const breakdownMap = new Map<
       string,
       { label: string; minutes: number; limit: number | null; max: number | null }
@@ -182,7 +212,7 @@ export function EmployeeAttendancePage() {
           });
         }
       });
-    } else if (record.breakMinutes) {
+    } else if (record?.breakMinutes) {
       breakdownMap.set("total", {
         label: "Total break",
         minutes: record.breakMinutes,
@@ -190,10 +220,32 @@ export function EmployeeAttendancePage() {
         max: breakThresholdMinutes,
       });
     }
+    if (liveOverride) {
+      const overrideMap: Record<BreakKey, string> = {
+        bio: "freshen",
+        lunch: "lunch",
+        tea: "tea",
+        meetingTraining: "meeting",
+      };
+      const overrideKey = overrideMap[liveOverride.key];
+      const overridePolicy = breakPolicies.find((item) => item.id === overrideKey);
+      const bucketKey = overridePolicy?.id ?? overrideKey;
+      if (bucketKey) {
+        breakdownMap.set(bucketKey, {
+          label: overridePolicy?.label ?? "Break",
+          minutes: liveOverride.minutes,
+          limit: overridePolicy?.limit ?? null,
+          max: overridePolicy?.max ?? null,
+        });
+      }
+    }
     return Array.from(breakdownMap.values()).filter((item) => item.minutes > 0);
   };
-  const getBreakExceedInfo = (record?: AttendanceRecord | null) => {
-    const breakdown = getBreakBreakdown(record);
+  const getBreakExceedInfo = (
+    record?: AttendanceRecord | null,
+    liveOverride?: { key: BreakKey; minutes: number } | null,
+  ) => {
+    const breakdown = getBreakBreakdown(record, liveOverride);
     const totalMinutes = breakdown.reduce((sum, item) => sum + item.minutes, 0);
     const totalAllowed = breakdown.reduce((sum, item) => sum + (item.max ?? 0), 0);
     const exceededItems = breakdown.filter((item) => item.max !== null && item.minutes > (item.max ?? 0));
@@ -313,10 +365,18 @@ export function EmployeeAttendancePage() {
   const selectedDate = selectedDateKey ? new Date(selectedDateKey) : null;
   const selectedStatus = selectedDate ? getDayStatus(selectedDate, selectedRecord) : "upcoming";
   const selectedStatusLabel = statusConfig[selectedStatus].label;
-  const selectedBreakMinutes = getBreakMinutes(selectedRecord);
-  const selectedBreakInfo = getBreakExceedInfo(selectedRecord);
+  const liveBreakMinutes =
+    selectedDateKey === todayKey && liveBreak
+      ? Math.max(0, Math.round((now - liveBreak.startedAt) / 60000))
+      : 0;
+  const selectedBreakMinutes = getBreakMinutes(selectedRecord) + liveBreakMinutes;
+  const selectedBreakInfo = getBreakExceedInfo(
+    selectedRecord,
+    selectedDateKey === todayKey && liveBreak
+      ? { key: liveBreak.key, minutes: liveBreakMinutes }
+      : null,
+  );
   const selectedBreakEntries = selectedBreakInfo.breakdown;
-  const selectedBreakCount = selectedBreakEntries.length;
   const selectedWorkMinutes = selectedRecord?.timeOnSystemMinutes ?? 0;
 
   const columns: Array<TableColumn<AttendanceRecord>> = [
@@ -593,7 +653,7 @@ export function EmployeeAttendancePage() {
                     Breaks
                   </p>
                   <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                    {selectedRecord ? `${formatMinutes(selectedBreakMinutes)} Â· ${selectedBreakCount} breaks` : "--"}
+                    {selectedRecord || liveBreak ? `${formatMinutes(selectedBreakMinutes)} · ${selectedBreakCount} breaks` : "--"}
                   </p>
                   {selectedBreakInfo.exceeds ? (
                     <p className="mt-2 text-xs font-bold text-rose-600 dark:text-rose-300">

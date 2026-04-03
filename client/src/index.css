@@ -171,7 +171,7 @@
   --tone-surface: rgba(15, 23, 42, 0.6);
   --tone-border: rgba(148, 163, 184, 0.2);
   --tone-ring: rgba(125, 211, 252, 0.28);
-}}
+}
 
 * {
   box-sizing: border-box;
@@ -295,6 +295,43 @@ textarea {
   .app-topbar {
     background-color: var(--topbar-bg);
     border-color: var(--topbar-border);
+  }
+
+  .topbar-accent-button {
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  .topbar-accent-button,
+  .topbar-accent-button > * {
+    color: inherit !important;
+  }
+
+  .topbar-accent-button--success {
+    color: #052e16 !important;
+  }
+
+  .topbar-accent-button--danger {
+    color: #4c0519 !important;
+  }
+
+  :root[data-theme="dark"] .topbar-accent-button {
+    text-shadow: none;
+  }
+
+  :root[data-theme="dark"] .topbar-accent-button--success {
+    background: linear-gradient(135deg, #86efac, #4ade80) !important;
+    border-color: #16a34a !important;
+    color: #03140b !important;
+  }
+
+  :root[data-theme="dark"] .topbar-accent-button--danger {
+    background: linear-gradient(135deg, #fda4af, #fb7185) !important;
+    border-color: #e11d48 !important;
+    color: #3b0714 !important;
+  }
+
+  :root[data-theme="dark"] .topbar-accent-button:disabled {
+    opacity: 0.9 !important;
   }
 
   .sidebar-brand-pill {

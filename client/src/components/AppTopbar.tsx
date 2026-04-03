@@ -29,6 +29,8 @@ type BreakConfig = {
 
 type BreakState = Record<BreakKey, { totalMs: number; activeStart: number | null }>;
 
+const LIVE_BREAK_STORAGE_KEY = "gcs-live-break";
+
 const breakConfigs: BreakConfig[] = [
   { key: "bio", label: "Freshen up break", redAtMinutes: 15 },
   { key: "lunch", label: "Lunch break", redAtMinutes: 35 },
@@ -66,6 +68,27 @@ const formatNotificationTimestamp = (value: string) => {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+};
+
+const readLiveBreak = (): { key: BreakKey; startedAt: number } | null => {
+  try {
+    const raw = window.localStorage.getItem(LIVE_BREAK_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { key?: BreakKey; startedAt?: number };
+    if (!parsed.key || !parsed.startedAt) return null;
+    if (!breakConfigs.some((config) => config.key === parsed.key)) return null;
+    return { key: parsed.key, startedAt: parsed.startedAt };
+  } catch {
+    return null;
+  }
+};
+
+const writeLiveBreak = (payload: { key: BreakKey; startedAt: number } | null) => {
+  if (!payload) {
+    window.localStorage.removeItem(LIVE_BREAK_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(LIVE_BREAK_STORAGE_KEY, JSON.stringify(payload));
 };
 
 const toCheckInTimestamp = (value: string): number | null => {
@@ -201,7 +224,11 @@ export function AppTopbar({
     const entry = breaks[key];
     return entry.totalMs + (entry.activeStart ? now - entry.activeStart : 0);
   };
-  const activeBreakElapsed = activeBreak ? getBreakElapsed(activeBreak) : 0;
+  const getBreakSessionElapsed = (key: BreakKey) => {
+    const entry = breaks[key];
+    return entry.activeStart ? now - entry.activeStart : 0;
+  };
+  const activeBreakElapsed = activeBreak ? getBreakSessionElapsed(activeBreak) : 0;
 
   const applyAttendanceRecord = useCallback((record: AttendanceRecord | null) => {
     setAttendanceRecord(record);
@@ -302,6 +329,26 @@ export function AppTopbar({
     void handleCheckIn(mode);
   };
 
+  useEffect(() => {
+    if (!checkInAt || checkedOut) {
+      writeLiveBreak(null);
+      setActiveBreak(null);
+      return;
+    }
+
+    const stored = readLiveBreak();
+    if (stored) {
+      setActiveBreak(stored.key);
+      setBreaks((prev) => ({
+        ...prev,
+        [stored.key]: {
+          totalMs: prev[stored.key].totalMs,
+          activeStart: stored.startedAt,
+        },
+      }));
+    }
+  }, [checkInAt, checkedOut]);
+
   const handleCheckIn = async (mode: AttendanceCheckInMode) => {
     if (attendanceBusy) {
       return;
@@ -316,6 +363,7 @@ export function AppTopbar({
       applyAttendanceRecord(record);
       setActiveBreak(null);
       setBreaks(createInitialBreaks());
+      writeLiveBreak(null);
     } catch (error) {
       setAttendanceError(error instanceof Error ? error.message : "Unable to check in.");
     } finally {
@@ -346,6 +394,7 @@ export function AppTopbar({
       applyAttendanceRecord(record);
       setActiveBreak(null);
       setBreaks(createInitialBreaks());
+      writeLiveBreak(null);
     } catch (error) {
       setAttendanceError(error instanceof Error ? error.message : "Unable to check out.");
     } finally {
@@ -357,6 +406,8 @@ export function AppTopbar({
     if (!checkInAt) {
       return;
     }
+
+    const nextActiveBreak = activeBreak === key ? null : key;
 
     setBreaks((prev) => {
       const next = { ...prev };
@@ -390,13 +441,11 @@ export function AppTopbar({
       return next;
     });
 
-    if (activeBreak === key) {
-      setActiveBreak(null);
-      return;
-    }
-
-    if (!activeBreak || activeBreak !== key) {
-      setActiveBreak(key);
+    setActiveBreak(nextActiveBreak);
+    if (nextActiveBreak) {
+      writeLiveBreak({ key: nextActiveBreak, startedAt: now });
+    } else {
+      writeLiveBreak(null);
     }
 
     setBreakMenuOpen(false);
@@ -425,7 +474,7 @@ export function AppTopbar({
                 setTrackerOpen(false);
               }}
               disabled={checkInDisabled}
-              className="inline-flex items-center gap-2 rounded-full border border-emerald-600 bg-emerald-300 px-3 py-2 text-[0.65rem] font-black uppercase tracking-[0.18em] text-emerald-950 shadow-[0_10px_22px_rgba(5,150,105,0.26)] transition hover:brightness-105 disabled:opacity-60"
+              className="topbar-accent-button topbar-accent-button--success inline-flex items-center gap-2 rounded-full border border-emerald-600 bg-emerald-300 px-3 py-2 text-[0.65rem] font-black uppercase tracking-[0.18em] shadow-[0_10px_22px_rgba(5,150,105,0.26)] transition hover:brightness-105 disabled:opacity-90"
             >
               {checkInAt ? "Checked in" : checkedOut ? "Checked out" : "Check in"}
               <ChevronDown className={`h-4 w-4 transition ${checkInMenuOpen ? "rotate-180" : ""}`} />
@@ -436,14 +485,14 @@ export function AppTopbar({
                   <button
                     type="button"
                     onClick={() => handleCheckInSelect("office")}
-                    className="rounded-xl border border-emerald-600 bg-emerald-300 px-3 py-2 text-left text-[0.65rem] font-black uppercase tracking-[0.18em] text-emerald-950 shadow-[0_8px_18px_rgba(5,150,105,0.26)]"
+                    className="topbar-accent-button topbar-accent-button--success rounded-xl border border-emerald-600 bg-emerald-300 px-3 py-2 text-left text-[0.65rem] font-black uppercase tracking-[0.18em] shadow-[0_8px_18px_rgba(5,150,105,0.26)]"
                   >
                     Check in office
                   </button>
                   <button
                     type="button"
                     onClick={() => handleCheckInSelect("remote")}
-                    className="rounded-xl border border-emerald-600 bg-emerald-300 px-3 py-2 text-left text-[0.65rem] font-black uppercase tracking-[0.18em] text-emerald-950 shadow-[0_8px_18px_rgba(5,150,105,0.26)]"
+                    className="topbar-accent-button topbar-accent-button--success rounded-xl border border-emerald-600 bg-emerald-300 px-3 py-2 text-left text-[0.65rem] font-black uppercase tracking-[0.18em] shadow-[0_8px_18px_rgba(5,150,105,0.26)]"
                   >
                     Check in remote
                   </button>
@@ -539,8 +588,8 @@ export function AppTopbar({
                       <div className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.14)] max-h-64 overflow-auto">
                         <div className="flex flex-col gap-2">
                           {breakConfigs.map((config) => {
-                            const elapsed = getBreakElapsed(config.key);
                             const isActive = activeBreak === config.key;
+                            const elapsed = isActive ? getBreakSessionElapsed(config.key) : getBreakElapsed(config.key);
                             const overLimit =
                               config.redAtMinutes !== undefined && elapsed >= config.redAtMinutes * 60_000;
                             const variant = !checkInAt
@@ -585,7 +634,7 @@ export function AppTopbar({
             type="button"
             onClick={handleCheckOut}
             disabled={checkOutDisabled}
-            className="rounded-full border border-rose-600 bg-rose-400 px-3 py-2 text-[0.65rem] font-black uppercase tracking-[0.18em] text-rose-950 shadow-[0_10px_22px_rgba(136,19,55,0.28)] transition hover:brightness-105 disabled:opacity-60"
+            className="topbar-accent-button topbar-accent-button--danger rounded-full border border-rose-600 bg-rose-400 px-3 py-2 text-[0.65rem] font-black uppercase tracking-[0.18em] shadow-[0_10px_22px_rgba(136,19,55,0.28)] transition hover:brightness-105 disabled:opacity-90"
           >
             Check out
           </button>

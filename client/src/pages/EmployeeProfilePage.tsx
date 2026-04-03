@@ -21,6 +21,7 @@ export function EmployeeProfilePage() {
   const { profile, signOut } = useAuthSession();
   const employeeHook = useApi(useCallback(() => hrService.getCurrentEmployee(), []));
   const settingsHook = useApi(useCallback(() => hrService.getSettings(), []));
+  const leaveHook = useApi(useCallback(() => hrService.getMyLeaveRequests(), []));
   const [detailsDraft, setDetailsDraft] = useState<EmployeeProfileDetailsPayload>(emptyEmployeeProfileDetails);
   const [detailsSaving, setDetailsSaving] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
@@ -48,6 +49,23 @@ export function EmployeeProfilePage() {
 
   const employee = employeeHook.data;
   const detailsComplete = hasCompleteEmployeeProfileDetails(employee);
+  const approvedLeaveTotals = (leaveHook.data ?? []).reduce(
+    (acc, leave) => {
+      if (leave.status !== "approved") return acc;
+      if (leave.leaveType === "annual") acc.annual += leave.days;
+      if (leave.leaveType === "sick") acc.sick += leave.days;
+      if (leave.leaveType === "casual") acc.casual += leave.days;
+      return acc;
+    },
+    { annual: 0, sick: 0, casual: 0 },
+  );
+  const remainingLeaves = settingsHook.data
+    ? {
+        annual: Math.max(0, settingsHook.data.leavePolicy.annual - approvedLeaveTotals.annual),
+        sick: Math.max(0, settingsHook.data.leavePolicy.sick - approvedLeaveTotals.sick),
+        casual: Math.max(0, settingsHook.data.leavePolicy.casual - approvedLeaveTotals.casual),
+      }
+    : null;
 
   const handleDetailsChange = (field: keyof EmployeeProfileDetailsPayload, value: string) => {
     setDetailsError(null);
@@ -124,20 +142,22 @@ export function EmployeeProfilePage() {
         <SectionCard title="Policy Defaults">
           {settingsHook.loading ? <p className="text-sm font-semibold text-brand-700">Loading policy defaults...</p> : null}
           {settingsHook.error ? <p className="text-sm font-semibold text-rose-700">{settingsHook.error}</p> : null}
+          {leaveHook.loading ? <p className="text-sm font-semibold text-brand-700">Loading leave usage...</p> : null}
+          {leaveHook.error ? <p className="text-sm font-semibold text-rose-700">{leaveHook.error}</p> : null}
 
-          {settingsHook.data ? (
+          {remainingLeaves ? (
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Annual Leave</p>
-                <p className="mt-2 text-2xl font-extrabold text-brand-900">{settingsHook.data.leavePolicy.annual}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Annual Leave Remaining</p>
+                <p className="mt-2 text-2xl font-extrabold text-brand-900">{remainingLeaves.annual}</p>
               </div>
               <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Sick Leave</p>
-                <p className="mt-2 text-2xl font-extrabold text-brand-900">{settingsHook.data.leavePolicy.sick}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Sick Leave Remaining</p>
+                <p className="mt-2 text-2xl font-extrabold text-brand-900">{remainingLeaves.sick}</p>
               </div>
               <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Casual Leave</p>
-                <p className="mt-2 text-2xl font-extrabold text-brand-900">{settingsHook.data.leavePolicy.casual}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Casual Leave Remaining</p>
+                <p className="mt-2 text-2xl font-extrabold text-brand-900">{remainingLeaves.casual}</p>
               </div>
             </div>
           ) : null}
