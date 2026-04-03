@@ -111,7 +111,7 @@ export function EmployeeProfilePage() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 className="font-display text-3xl font-extrabold text-brand-950">{employee.name}</h2>
-                  <p className="mt-2 inline-flex rounded-full bg-white/85 px-3 py-1 text-sm font-semibold text-brand-900 shadow-sm ring-1 ring-brand-200/80">
+                  <p className="mt-2 inline-flex rounded-full border border-brand-200/80 bg-white/85 px-3 py-1 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-brand-200/80 dark:border-slate-600/70 dark:bg-slate-900/85 dark:text-slate-100 dark:ring-slate-600/60">
                     {employee.email}
                   </p>
                 </div>

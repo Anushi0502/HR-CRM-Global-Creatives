@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { hrService } from "../services/hrService";
 import type { AttendanceCheckInMode, AttendanceRecord, Notification } from "../types/hr";
 import type { NavItem } from "../types/navigation";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface AppTopbarProps {
   onSignOut: () => void;
@@ -462,6 +463,9 @@ export function AppTopbar({
           <div className="hidden items-center gap-2 rounded-full border border-white/55 bg-white/68 px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.08)] md:inline-flex">
             <Clock3 className="h-4 w-4 text-brand-700" />
             {timeLabel}
+          </div>
+          <div className="relative">
+            <ThemeToggle className="min-h-[42px]" />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">

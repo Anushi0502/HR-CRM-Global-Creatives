@@ -182,7 +182,13 @@ export function EmployeePayrollPage() {
                 <CircleDollarSign className="h-3.5 w-3.5" />
                 Current status
               </p>
-              <p className="mt-2 text-lg font-bold text-brand-900">{latestPayroll ? latestPayroll.status : "No data yet"}</p>
+              <div className="mt-2">
+                {latestPayroll ? (
+                  <StatusBadge value={latestPayroll.status} />
+                ) : (
+                  <p className="text-lg font-bold text-brand-900">No data yet</p>
+                )}
+              </div>
             </div>
             <div className="rounded-2xl border border-brand-200 bg-white p-4">
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-brand-700">Net vs deductions</p>
