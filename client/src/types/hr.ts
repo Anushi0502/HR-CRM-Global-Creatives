@@ -1,5 +1,8 @@
 export type EmployeeStatus = "active" | "on_leave" | "inactive";
 export type AttendanceStatus = "present" | "late" | "remote" | "absent";
+export type AttendanceBreakKey = "bio" | "lunch" | "tea" | "meetingTraining";
+export type ShiftCode = "shift_1" | "shift_2" | "shift_3";
+export type ShiftApprovalStatus = "pending" | "approved";
 export type LeaveStatus = "approved" | "pending" | "rejected";
 export type CandidateStage = "sourced" | "interview" | "offer" | "hired" | "rejected";
 export type PayrollStatus = "processed" | "scheduled";
@@ -36,6 +39,8 @@ export interface Employee {
   manager: string;
   status: EmployeeStatus;
   performanceScore: number;
+  shiftCode?: ShiftCode | null;
+  shiftApprovalStatus?: ShiftApprovalStatus;
   avgTimeOnSystemMinutes: number;
   mobile: string | null;
   address: string | null;
@@ -64,6 +69,8 @@ export interface UpdateEmployeePayload {
   manager: string;
   status: EmployeeStatus;
   performanceScore: number;
+  shiftCode: ShiftCode | null;
+  shiftApprovalStatus: ShiftApprovalStatus;
 }
 
 export interface EmployeeProfileDetailsPayload {
@@ -72,6 +79,21 @@ export interface EmployeeProfileDetailsPayload {
   pan: string;
   bankName: string;
   bankAccountNumber: string;
+}
+
+export type AttendanceBreakLegacySummary = Partial<Record<AttendanceBreakKey, number>>;
+
+export interface AttendanceBreakSession {
+  id: string;
+  key: AttendanceBreakKey;
+  minutes: number;
+  startedAt: string | null;
+  endedAt: string | null;
+}
+
+export interface AttendanceBreakSummary {
+  totals: AttendanceBreakLegacySummary;
+  sessions: AttendanceBreakSession[];
 }
 
 export interface AttendanceRecord {
@@ -86,7 +108,7 @@ export interface AttendanceRecord {
   checkOutAt: string | null;
   breakMinutes: number;
   timeOnSystemMinutes: number;
-  breakSummary?: Record<string, number> | null;
+  breakSummary?: AttendanceBreakSummary | AttendanceBreakLegacySummary | null;
 }
 
 export type AttendanceCheckInMode = "office" | "remote";
@@ -312,6 +334,7 @@ export interface NewEmployeePayload {
   manager: string;
   status: EmployeeStatus;
   performanceScore: number;
+  shiftCode: ShiftCode | null;
 }
 
 export interface DocumentDispatchResult {

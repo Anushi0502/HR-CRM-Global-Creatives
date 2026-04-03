@@ -28,6 +28,8 @@ import type {
   Notification,
   NotificationRole,
   PriorityItem,
+  ShiftApprovalStatus,
+  ShiftCode,
   Task,
   TaskPriority,
   TaskSummary,
@@ -37,6 +39,11 @@ import type {
 import { seedAnnouncements, seedNotifications } from "../data/mockData";
 import { supabase } from "./supabaseClient";
 import { getLocalDateKey, getLocalTimeLabel } from "../utils/formatters";
+import {
+  DEFAULT_SHIFT_APPROVAL_STATUS,
+  DEFAULT_SHIFT_CODE,
+  getApprovedShiftDefinition,
+} from "../utils/shifts";
 
 interface EmployeeQuery {
   search?: string;
@@ -56,6 +63,8 @@ interface EmployeeRow {
   manager: string;
   status: Employee["status"];
   performance_score: number;
+  shift_code?: ShiftCode | null;
+  shift_approval_status?: ShiftApprovalStatus | null;
   avg_time_on_system_minutes: number | null;
 }
 
@@ -80,7 +89,7 @@ interface AttendanceRow {
   check_out_at: string | null;
   break_minutes: number | null;
   time_on_system_minutes: number | null;
-  break_summary: Record<string, number> | null;
+  break_summary: AttendanceRecord["breakSummary"];
 }
 
 interface LeaveRequestRow {
@@ -442,6 +451,8 @@ function toEmployee(row: EmployeeRow, details?: EmployeePrivateDetailsRow | null
     manager: row.manager,
     status: row.status,
     performanceScore: row.performance_score,
+    shiftCode: row.shift_code ?? DEFAULT_SHIFT_CODE,
+    shiftApprovalStatus: row.shift_approval_status ?? DEFAULT_SHIFT_APPROVAL_STATUS,
     avgTimeOnSystemMinutes: row.avg_time_on_system_minutes ?? 0,
     mobile: details?.mobile ?? null,
     address: details?.address ?? null,
@@ -677,13 +688,23 @@ function countLeaveDays(startDate: string, endDate: string): number {
   return Math.max(Math.floor(diff / (1000 * 60 * 60 * 24)) + 1, 1);
 }
 
-function resolveAttendanceStatus(mode: AttendanceCheckInMode, stamp: Date): AttendanceRecord["status"] {
+function resolveAttendanceStatus(
+  mode: AttendanceCheckInMode,
+  stamp: Date,
+  employee?: Pick<Employee, "shiftCode" | "shiftApprovalStatus"> | null,
+): AttendanceRecord["status"] {
   if (mode === "remote") {
     return "remote";
   }
 
   const totalMinutes = stamp.getHours() * 60 + stamp.getMinutes();
-  return totalMinutes > 9 * 60 + 15 ? "late" : "present";
+  const approvedShift = getApprovedShiftDefinition(employee);
+  const shiftStartMinutes = approvedShift?.startMinutes ?? getApprovedShiftDefinition({
+    shiftCode: DEFAULT_SHIFT_CODE,
+    shiftApprovalStatus: "approved",
+  })?.startMinutes ?? 9 * 60 + 30;
+
+  return totalMinutes > shiftStartMinutes ? "late" : "present";
 }
 
 function hasMissingUserIdColumn(error: { message: string } | null): boolean {
@@ -732,6 +753,8 @@ async function createEmployeeRecordForUser(user: CurrentUserAuth): Promise<Emplo
     manager: "HR Admin",
     status: "active" as const,
     performance_score: 80,
+    shift_code: DEFAULT_SHIFT_CODE,
+    shift_approval_status: DEFAULT_SHIFT_APPROVAL_STATUS,
   };
 
   if (employeesUserIdState !== "missing") {
@@ -827,6 +850,8 @@ function buildFallbackEmployee(user: CurrentUserAuth, employeeId?: string): Empl
     manager: "HR Admin",
     status: "active",
     performanceScore: 80,
+    shiftCode: DEFAULT_SHIFT_CODE,
+    shiftApprovalStatus: DEFAULT_SHIFT_APPROVAL_STATUS,
     avgTimeOnSystemMinutes: 0,
     mobile: null,
     address: null,
@@ -1228,6 +1253,8 @@ export const hrService = {
       manager: payload.manager,
       status: payload.status,
       performance_score: payload.performanceScore,
+      shift_code: payload.shiftCode ?? DEFAULT_SHIFT_CODE,
+      shift_approval_status: DEFAULT_SHIFT_APPROVAL_STATUS,
       avg_time_on_system_minutes: 0,
     };
 
@@ -1311,6 +1338,8 @@ export const hrService = {
         manager: payload.manager,
         status: payload.status,
         performance_score: payload.performanceScore,
+        shift_code: payload.shiftCode ?? DEFAULT_SHIFT_CODE,
+        shift_approval_status: payload.shiftCode ? payload.shiftApprovalStatus : DEFAULT_SHIFT_APPROVAL_STATUS,
       })
       .eq("id", id)
       .select("*")
@@ -2042,7 +2071,7 @@ export const hrService = {
         return todayRecord;
       }
 
-      const nextStatus = resolveAttendanceStatus(mode, now);
+      const nextStatus = resolveAttendanceStatus(mode, now, employee);
       const { data, error } = await client
         .from("attendance_records")
         .update({
@@ -2065,7 +2094,7 @@ export const hrService = {
       date: today,
       check_in: currentTime,
       check_out: "--",
-      status: resolveAttendanceStatus(mode, now),
+      status: resolveAttendanceStatus(mode, now, employee),
       check_in_at: currentTimestamp,
       check_out_at: null,
       break_minutes: 0,
@@ -2096,7 +2125,7 @@ export const hrService = {
 
   updateMyAttendanceProgress: async (payload: {
     breakMinutes?: number;
-    breakSummary?: Record<string, number> | null;
+    breakSummary?: AttendanceRecord["breakSummary"];
     timeOnSystemMinutes?: number;
   }): Promise<AttendanceRecord | null> => {
     const client = assertSupabase();
@@ -2134,7 +2163,7 @@ export const hrService = {
   markMyCheckOut: async (
     payload?: {
       breakMinutes?: number;
-      breakSummary?: Record<string, number> | null;
+      breakSummary?: AttendanceRecord["breakSummary"];
       timeOnSystemMinutes?: number;
     },
   ): Promise<AttendanceRecord> => {

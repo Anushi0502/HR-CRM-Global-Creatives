@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -24,8 +24,16 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useApi } from "../hooks/useApi";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { hrService, isNewUserEmployeeSetupError } from "../services/hrService";
-import type { AttendanceRecord } from "../types/hr";
+import type { AttendanceBreakKey, AttendanceRecord } from "../types/hr";
+import {
+  BREAK_CONFIGS as breakPolicies,
+  LIVE_BREAK_STORAGE_KEY,
+  getBreakConfig,
+  normalizeBreakSummary,
+} from "../utils/attendanceBreaks";
 import { formatDate, getLocalDateKey } from "../utils/formatters";
+
+type BreakKey = AttendanceBreakKey;
 
 export function EmployeeAttendancePage() {
   const { profile, signOut } = useAuthSession();
@@ -51,7 +59,7 @@ export function EmployeeAttendancePage() {
   useEffect(() => {
     const readLiveBreak = () => {
       try {
-        const raw = window.localStorage.getItem("gcs-live-break");
+        const raw = window.localStorage.getItem(LIVE_BREAK_STORAGE_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw) as { key?: BreakKey; startedAt?: number };
         if (!parsed.key || !parsed.startedAt) return null;
@@ -75,12 +83,6 @@ export function EmployeeAttendancePage() {
   }, []);
 
   const breakThresholdMinutes = 60;
-  const breakPolicies = [
-    { id: "freshen", label: "Freshen Up", limit: 15, max: 15, match: ["fresh", "bio", "wash"] },
-    { id: "lunch", label: "Lunch", limit: 30, max: 35, match: ["lunch"] },
-    { id: "tea", label: "Tea", limit: 15, max: 20, match: ["tea"] },
-    { id: "meeting", label: "Meeting / Training", limit: null, max: null, match: ["meeting", "training"] },
-  ] as const;
   const monthNames = useMemo(
     () =>
       Array.from({ length: 12 }, (_, index) =>
@@ -171,79 +173,109 @@ export function EmployeeAttendancePage() {
     if (hours === 0) return `${mins}m`;
     return `${hours}h ${mins}m`;
   };
+  type BreakEntry = {
+    id: string;
+    key: BreakKey | "total";
+    label: string;
+    minutes: number;
+    limit: number | null;
+    max: number | null;
+    startedAt: string | null;
+    endedAt: string | null;
+  };
   const getBreakMinutes = (record?: AttendanceRecord | null) => {
     if (!record) return 0;
-    if (record.breakMinutes && record.breakMinutes > 0) return record.breakMinutes;
-    if (record.breakSummary) {
-      return Object.values(record.breakSummary).reduce((sum, value) => sum + (value ?? 0), 0);
+    const normalized = normalizeBreakSummary(record.breakSummary ?? null);
+    const summaryTotal = Object.values(normalized.totals).reduce((sum, value) => sum + (value ?? 0), 0);
+    if (summaryTotal > 0) {
+      return summaryTotal;
     }
-    return 0;
+    return record.breakMinutes ?? 0;
   };
-  const formatBreakLabel = (value: string) =>
-    value
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (match) => match.toUpperCase());
   const getBreakBreakdown = (
     record?: AttendanceRecord | null,
-    liveOverride?: { key: BreakKey; minutes: number } | null,
+    liveOverride?: { key: BreakKey; minutes: number; startedAt?: number } | null,
   ) => {
     if (!record && !liveOverride) return [];
-    const summary = record?.breakSummary ?? null;
-    const breakdownMap = new Map<
-      string,
-      { label: string; minutes: number; limit: number | null; max: number | null }
-    >();
-    if (summary) {
-      Object.entries(summary).forEach(([key, minutes]) => {
-        const normalized = key.toLowerCase();
-        const policy = breakPolicies.find((item) =>
-          item.match.some((token) => normalized.includes(token)),
-        );
-        const bucketKey = policy?.id ?? normalized;
-        const existing = breakdownMap.get(bucketKey);
-        if (existing) {
-          existing.minutes += minutes ?? 0;
-        } else {
-          breakdownMap.set(bucketKey, {
-            label: policy?.label ?? formatBreakLabel(key),
-            minutes: minutes ?? 0,
-            limit: policy?.limit ?? null,
-            max: policy?.max ?? null,
-          });
-        }
-      });
-    } else if (record?.breakMinutes) {
-      breakdownMap.set("total", {
+    const normalized = normalizeBreakSummary(record?.breakSummary ?? null);
+    const breakdown: BreakEntry[] =
+      normalized.sessions.length > 0
+        ? normalized.sessions.map((session) => {
+            const policy = getBreakConfig(session.key);
+            return {
+              id: session.id,
+              key: session.key,
+              label: policy.label,
+              minutes: session.minutes,
+              limit: policy.limit,
+              max: policy.max,
+              startedAt: session.startedAt,
+              endedAt: session.endedAt,
+            };
+          })
+        : breakPolicies
+            .filter((policy) => normalized.totals[policy.key] > 0)
+            .map((policy, index) => ({
+              id: `legacy-${policy.key}-${index + 1}`,
+              key: policy.key,
+              label: policy.label,
+              minutes: normalized.totals[policy.key],
+              limit: policy.limit,
+              max: policy.max,
+              startedAt: null,
+              endedAt: null,
+            }));
+
+    if (breakdown.length === 0 && record?.breakMinutes) {
+      breakdown.push({
+        id: "total-break",
+        key: "total",
         label: "Total break",
         minutes: record.breakMinutes,
         limit: breakThresholdMinutes,
         max: breakThresholdMinutes,
+        startedAt: null,
+        endedAt: null,
       });
     }
+
     if (liveOverride) {
-      const overrideMap: Record<BreakKey, string> = {
-        bio: "freshen",
-        lunch: "lunch",
-        tea: "tea",
-        meetingTraining: "meeting",
-      };
-      const overrideKey = overrideMap[liveOverride.key];
-      const overridePolicy = breakPolicies.find((item) => item.id === overrideKey);
-      const bucketKey = overridePolicy?.id ?? overrideKey;
-      if (bucketKey) {
-        breakdownMap.set(bucketKey, {
-          label: overridePolicy?.label ?? "Break",
+      const livePolicy = getBreakConfig(liveOverride.key);
+      const liveEntry = {
+        id: `live-${liveOverride.key}-${liveOverride.startedAt ?? "now"}`,
+        key: liveOverride.key,
+        label: livePolicy.label,
+        minutes: liveOverride.minutes,
+        limit: livePolicy.limit,
+        max: livePolicy.max,
+        startedAt: liveOverride.startedAt ? new Date(liveOverride.startedAt).toISOString() : null,
+        endedAt: null,
+      } satisfies BreakEntry;
+      const existingIndex = breakdown.findIndex(
+        (entry) => entry.key === liveOverride.key && entry.endedAt === null,
+      );
+      if (existingIndex >= 0) {
+        breakdown[existingIndex] = {
+          ...breakdown[existingIndex],
           minutes: liveOverride.minutes,
-          limit: overridePolicy?.limit ?? null,
-          max: overridePolicy?.max ?? null,
-        });
+          startedAt: liveEntry.startedAt,
+        };
+      } else {
+        breakdown.push(liveEntry);
       }
     }
-    return Array.from(breakdownMap.values()).filter((item) => item.minutes > 0);
+
+    return breakdown
+      .filter((item) => item.minutes > 0)
+      .sort((left, right) => {
+        const leftStamp = left.startedAt ? new Date(left.startedAt).valueOf() : 0;
+        const rightStamp = right.startedAt ? new Date(right.startedAt).valueOf() : 0;
+        return leftStamp - rightStamp || left.label.localeCompare(right.label);
+      });
   };
   const getBreakExceedInfo = (
     record?: AttendanceRecord | null,
-    liveOverride?: { key: BreakKey; minutes: number } | null,
+    liveOverride?: { key: BreakKey; minutes: number; startedAt?: number } | null,
   ) => {
     const breakdown = getBreakBreakdown(record, liveOverride);
     const totalMinutes = breakdown.reduce((sum, item) => sum + item.minutes, 0);
@@ -367,16 +399,17 @@ export function EmployeeAttendancePage() {
   const selectedStatusLabel = statusConfig[selectedStatus].label;
   const liveBreakMinutes =
     selectedDateKey === todayKey && liveBreak
-      ? Math.max(0, Math.round((now - liveBreak.startedAt) / 60000))
+      ? Math.max(0, Math.round((Date.now() - liveBreak.startedAt) / 60000))
       : 0;
-  const selectedBreakMinutes = getBreakMinutes(selectedRecord) + liveBreakMinutes;
   const selectedBreakInfo = getBreakExceedInfo(
     selectedRecord,
     selectedDateKey === todayKey && liveBreak
-      ? { key: liveBreak.key, minutes: liveBreakMinutes }
+      ? { key: liveBreak.key, minutes: liveBreakMinutes, startedAt: liveBreak.startedAt }
       : null,
   );
   const selectedBreakEntries = selectedBreakInfo.breakdown;
+  const selectedBreakMinutes = selectedBreakInfo.totalMinutes;
+  const selectedBreakCount = selectedBreakEntries.length;
   const selectedWorkMinutes = selectedRecord?.timeOnSystemMinutes ?? 0;
 
   const columns: Array<TableColumn<AttendanceRecord>> = [
@@ -606,17 +639,6 @@ export function EmployeeAttendancePage() {
                   );
                 })}
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {Object.values(statusConfig).map((config) => (
-                  <span
-                    key={config.label}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80 dark:text-slate-300"
-                  >
-                    <span className={`h-2 w-2 rounded-full ${config.dot}`} />
-                    {config.label}
-                  </span>
-                ))}
-              </div>
             </div>
 
             <div className="rounded-[28px] border border-slate-200/70 bg-white/95 p-5 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80">
@@ -653,7 +675,11 @@ export function EmployeeAttendancePage() {
                     Breaks
                   </p>
                   <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                    {selectedRecord || liveBreak ? `${formatMinutes(selectedBreakMinutes)} � ${selectedBreakCount} breaks` : "--"}
+                    {selectedRecord || liveBreak
+                      ? `${formatMinutes(selectedBreakMinutes)} · ${selectedBreakCount} ${
+                          selectedBreakCount === 1 ? "break" : "breaks"
+                        }`
+                      : "--"}
                   </p>
                   {selectedBreakInfo.exceeds ? (
                     <p className="mt-2 text-xs font-bold text-rose-600 dark:text-rose-300">
@@ -667,7 +693,7 @@ export function EmployeeAttendancePage() {
                           entry.max !== null && entry.minutes > (entry.max ?? 0);
                         return (
                           <span
-                            key={entry.label}
+                            key={entry.id}
                             className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold ${
                               exceeded
                                 ? "border-rose-300 bg-rose-100 text-rose-700 dark:border-rose-400/40 dark:bg-rose-400/15 dark:text-rose-200"
@@ -711,3 +737,5 @@ export function EmployeeAttendancePage() {
     </div>
   );
 }
+
+

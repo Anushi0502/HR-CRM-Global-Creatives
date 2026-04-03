@@ -26,6 +26,12 @@ import { useApi } from "../hooks/useApi";
 import { hrService } from "../services/hrService";
 import type { Employee, NewEmployeePayload, UpdateEmployeePayload } from "../types/hr";
 import { formatDate, getInitials } from "../utils/formatters";
+import {
+  DEFAULT_SHIFT_APPROVAL_STATUS,
+  DEFAULT_SHIFT_CODE,
+  SHIFT_DEFINITIONS,
+  formatShiftLabel,
+} from "../utils/shifts";
 
 const initialForm: NewEmployeePayload = {
   name: "",
@@ -37,6 +43,7 @@ const initialForm: NewEmployeePayload = {
   manager: "",
   status: "active",
   performanceScore: 80,
+  shiftCode: null,
 };
 
 const initialEditForm: UpdateEmployeePayload = {
@@ -46,6 +53,8 @@ const initialEditForm: UpdateEmployeePayload = {
   manager: "",
   status: "active",
   performanceScore: 80,
+  shiftCode: DEFAULT_SHIFT_CODE,
+  shiftApprovalStatus: DEFAULT_SHIFT_APPROVAL_STATUS,
 };
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
@@ -204,6 +213,8 @@ export function EmployeesPage() {
       manager: selectedEmployee.manager,
       status: selectedEmployee.status,
       performanceScore: selectedEmployee.performanceScore,
+      shiftCode: selectedEmployee.shiftCode ?? DEFAULT_SHIFT_CODE,
+      shiftApprovalStatus: selectedEmployee.shiftApprovalStatus ?? DEFAULT_SHIFT_APPROVAL_STATUS,
     });
   }, [selectedEmployee]);
 
@@ -330,16 +341,21 @@ export function EmployeesPage() {
   ];
 
   const handleChange = (field: keyof NewEmployeePayload, value: string) => {
+    const nextValue = field === "performanceScore" ? Number(value) : field === "shiftCode" ? value || null : value;
     setFormState((current) => ({
       ...current,
-      [field]: field === "performanceScore" ? Number(value) : value,
+      [field]: nextValue,
     }));
   };
 
   const handleEditChange = (field: keyof UpdateEmployeePayload, value: string) => {
+    const nextValue = field === "performanceScore" ? Number(value) : field === "shiftCode" ? value || null : value;
     setEditState((current) => ({
       ...current,
-      [field]: field === "performanceScore" ? Number(value) : value,
+      [field]: nextValue,
+      ...(field === "shiftCode" && selectedEmployee && nextValue !== (selectedEmployee.shiftCode ?? DEFAULT_SHIFT_CODE)
+        ? { shiftApprovalStatus: DEFAULT_SHIFT_APPROVAL_STATUS }
+        : {}),
     }));
   };
 
@@ -353,6 +369,7 @@ export function EmployeesPage() {
       joinDate: new Date().toISOString().slice(0, 10),
       status: "active",
       performanceScore: 78,
+      shiftCode: DEFAULT_SHIFT_CODE,
     });
     setSubmitError(null);
     setActionMessage("Starter template loaded into the add employee form.");
@@ -363,6 +380,12 @@ export function EmployeesPage() {
     setSubmitting(true);
     setSubmitError(null);
     setActionMessage(null);
+
+    if (!formState.shiftCode) {
+      setSubmitError("Select a shift before adding the employee.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const result = await hrService.createEmployee(formState);
@@ -648,6 +671,14 @@ export function EmployeesPage() {
                 <input required value={formState.manager} onChange={(event) => handleChange("manager", event.target.value)} placeholder="Manager" className="input-surface w-full" />
               </div>
               <input required type="date" value={formState.joinDate} onChange={(event) => handleChange("joinDate", event.target.value)} className="input-surface w-full" />
+              <select required value={formState.shiftCode ?? ""} onChange={(event) => handleChange("shiftCode", event.target.value)} className="input-surface w-full">
+                <option value="">Select shift</option>
+                {SHIFT_DEFINITIONS.map((shift) => (
+                  <option key={shift.code} value={shift.code}>
+                    {shift.label}
+                  </option>
+                ))}
+              </select>
               <select value={formState.status} onChange={(event) => handleChange("status", event.target.value)} className="input-surface w-full">
                 <option value="active">Active</option>
                 <option value="on_leave">On leave</option>
@@ -681,7 +712,7 @@ export function EmployeesPage() {
                     <StatusBadge value={selectedEmployee.status} />
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-4">
                     <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
                       <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Location</p>
                       <p className="mt-2 text-sm font-semibold text-slate-950">{selectedEmployee.location}</p>
@@ -693,6 +724,15 @@ export function EmployeesPage() {
                     <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
                       <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Tenure</p>
                       <p className="mt-2 text-sm font-semibold text-slate-950">{formatTenure(selectedEmployee.joinDate)}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+                      <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Shift</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-950">
+                        {formatShiftLabel(selectedEmployee.shiftCode ?? DEFAULT_SHIFT_CODE)}
+                      </p>
+                      <div className="mt-2">
+                        <StatusBadge value={selectedEmployee.shiftApprovalStatus ?? DEFAULT_SHIFT_APPROVAL_STATUS} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -728,6 +768,33 @@ export function EmployeesPage() {
                   <input value={editState.location} onChange={(event) => handleEditChange("location", event.target.value)} placeholder="Location" className="input-surface w-full" />
                   <input value={editState.manager} onChange={(event) => handleEditChange("manager", event.target.value)} placeholder="Manager" className="input-surface w-full" />
                 </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Shift</label>
+                    <select value={editState.shiftCode ?? ""} onChange={(event) => handleEditChange("shiftCode", event.target.value)} className="input-surface w-full">
+                      {SHIFT_DEFINITIONS.map((shift) => (
+                        <option key={shift.code} value={shift.code}>
+                          {shift.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Shift approval</label>
+                    <select
+                      value={editState.shiftApprovalStatus}
+                      onChange={(event) => handleEditChange("shiftApprovalStatus", event.target.value)}
+                      className="input-surface w-full"
+                    >
+                      <option value="pending">Pending approval</option>
+                      <option value="approved">Approved</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs font-medium text-slate-500">
+                  Office attendance is marked from the approved shift start time for this employee.
+                </p>
 
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Performance score</label>

@@ -139,7 +139,7 @@ export function EmployeeProfilePage() {
           </div>
         </section>
 
-        <SectionCard title="Policy Defaults">
+        <SectionCard title="Leave remainig">
           {settingsHook.loading ? <p className="text-sm font-semibold text-brand-700">Loading policy defaults...</p> : null}
           {settingsHook.error ? <p className="text-sm font-semibold text-rose-700">{settingsHook.error}</p> : null}
           {leaveHook.loading ? <p className="text-sm font-semibold text-brand-700">Loading leave usage...</p> : null}

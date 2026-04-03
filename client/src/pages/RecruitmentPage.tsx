@@ -12,6 +12,7 @@ import { useApi } from "../hooks/useApi";
 import { hrService } from "../services/hrService";
 import type { Candidate, CandidateStage, CreateEmployeeResult, NewCandidatePayload, NewEmployeePayload } from "../types/hr";
 import { formatDate } from "../utils/formatters";
+import { DEFAULT_SHIFT_CODE } from "../utils/shifts";
 
 const stageOptions: CandidateStage[] = ["sourced", "interview", "offer", "hired", "rejected"];
 const candidateCreateStageOptions: CandidateStage[] = ["sourced", "interview", "offer", "rejected"];
@@ -36,6 +37,7 @@ const initialHireForm: NewEmployeePayload = {
   manager: "HR Admin",
   status: "active",
   performanceScore: 82,
+  shiftCode: DEFAULT_SHIFT_CODE,
 };
 
 function suggestDepartment(role: string): string {

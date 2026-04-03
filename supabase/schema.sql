@@ -24,12 +24,16 @@ create table if not exists public.employees (
   manager text not null,
   status text not null check (status in ('active', 'on_leave', 'inactive')),
   performance_score integer not null check (performance_score >= 0 and performance_score <= 100),
+  shift_code text default 'shift_1' check (shift_code in ('shift_1', 'shift_2', 'shift_3')),
+  shift_approval_status text not null default 'pending' check (shift_approval_status in ('pending', 'approved')),
   avg_time_on_system_minutes integer not null default 0,
   created_at timestamptz not null default now()
 );
 
 alter table public.employees add column if not exists user_id uuid;
 alter table public.employees add column if not exists avg_time_on_system_minutes integer not null default 0;
+alter table public.employees add column if not exists shift_code text default 'shift_1';
+alter table public.employees add column if not exists shift_approval_status text not null default 'pending';
 
 create table if not exists public.employee_private_details (
   employee_id text primary key references public.employees(id) on delete cascade,
@@ -816,13 +820,13 @@ create policy tasks_update_policy on public.tasks
   for update to authenticated
   using (public.is_task_assigner() or assignee_id = public.get_my_employee_id())
   with check (public.is_task_assigner() or assignee_id = public.get_my_employee_id());
-
+ 
 create policy tasks_delete_policy on public.tasks
   for delete to authenticated
   using (public.is_admin() or public.is_task_assigner());
 
 create policy settings_select_policy on public.crm_settings
-  for select to authenticated
+  for select to authenticated 
   using (true);
 
 create policy settings_write_policy on public.crm_settings

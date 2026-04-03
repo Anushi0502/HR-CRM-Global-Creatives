@@ -2,8 +2,20 @@ import { Bell, ChevronDown, Clock3, LogOut, Play, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { hrService } from "../services/hrService";
-import type { AttendanceCheckInMode, AttendanceRecord, Notification } from "../types/hr";
+import type {
+  AttendanceBreakKey,
+  AttendanceBreakSession,
+  AttendanceCheckInMode,
+  AttendanceRecord,
+  Notification,
+} from "../types/hr";
 import type { NavItem } from "../types/navigation";
+import {
+  BREAK_CONFIGS as breakConfigs,
+  BREAK_KEYS,
+  LIVE_BREAK_STORAGE_KEY,
+  normalizeBreakSummary,
+} from "../utils/attendanceBreaks";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface AppTopbarProps {
@@ -20,31 +32,18 @@ interface AppTopbarProps {
   notificationsOpen?: boolean;
 }
 
-type BreakKey = "bio" | "lunch" | "tea" | "meetingTraining";
-
-type BreakConfig = {
-  key: BreakKey;
-  label: string;
-  redAtMinutes?: number;
-};
+type BreakKey = AttendanceBreakKey;
 
 type BreakState = Record<BreakKey, { totalMs: number; activeStart: number | null }>;
 
-const LIVE_BREAK_STORAGE_KEY = "gcs-live-break";
-
-const breakConfigs: BreakConfig[] = [
-  { key: "bio", label: "Freshen up break", redAtMinutes: 15 },
-  { key: "lunch", label: "Lunch break", redAtMinutes: 35 },
-  { key: "tea", label: "Tea break", redAtMinutes: 20 },
-  { key: "meetingTraining", label: "Meeting / Training" },
-];
-
-const createInitialBreaks = (): BreakState => ({
-  bio: { totalMs: 0, activeStart: null },
-  lunch: { totalMs: 0, activeStart: null },
-  tea: { totalMs: 0, activeStart: null },
-  meetingTraining: { totalMs: 0, activeStart: null },
-});
+const createInitialBreaks = (): BreakState =>
+  BREAK_KEYS.reduce(
+    (acc, key) => {
+      acc[key] = { totalMs: 0, activeStart: null };
+      return acc;
+    },
+    {} as BreakState,
+  );
 
 const formatDuration = (ms: number): string => {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -143,10 +142,10 @@ export function AppTopbar({
   const [checkInAt, setCheckInAt] = useState<number | null>(null);
   const [activeBreak, setActiveBreak] = useState<BreakKey | null>(null);
   const [breaks, setBreaks] = useState<BreakState>(() => createInitialBreaks());
+  const [breakSessions, setBreakSessions] = useState<AttendanceBreakSession[]>([]);
   const [attendanceRecord, setAttendanceRecord] = useState<AttendanceRecord | null>(null);
   const [attendanceBusy, setAttendanceBusy] = useState(false);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
-  const [breakMenuOpen, setBreakMenuOpen] = useState(false);
   const [checkInMenuOpen, setCheckInMenuOpen] = useState(false);
 
   const currentTitle = useMemo(
@@ -230,6 +229,23 @@ export function AppTopbar({
     return entry.activeStart ? now - entry.activeStart : 0;
   };
   const activeBreakElapsed = activeBreak ? getBreakSessionElapsed(activeBreak) : 0;
+  const breakSessionCounts = useMemo(
+    () =>
+      breakSessions.reduce(
+        (acc, session) => {
+          acc[session.key] += 1;
+          return acc;
+        },
+        BREAK_KEYS.reduce(
+          (acc, key) => {
+            acc[key] = 0;
+            return acc;
+          },
+          {} as Record<BreakKey, number>,
+        ),
+      ),
+    [breakSessions],
+  );
 
   const applyAttendanceRecord = useCallback((record: AttendanceRecord | null) => {
     setAttendanceRecord(record);
@@ -240,36 +256,99 @@ export function AppTopbar({
           : toCheckInTimestamp(record.checkIn)
         : null;
     setCheckInAt(nextCheckInAt);
-    if (record && record.checkOut === "--" && record.breakSummary) {
-      setBreaks(() => {
-        const next = createInitialBreaks();
-        breakConfigs.forEach((config) => {
-          const minutes = record.breakSummary?.[config.key] ?? 0;
-          next[config.key] = { totalMs: minutes * 60_000, activeStart: null };
+    const normalizedBreaks = normalizeBreakSummary(record?.breakSummary ?? null);
+    const liveBreak = record && record.checkOut === "--" ? readLiveBreak() : null;
+    setActiveBreak(liveBreak?.key ?? null);
+    setBreakSessions(() => {
+      const nextSessions = [...normalizedBreaks.sessions];
+
+      if (liveBreak && !nextSessions.some((session) => session.key === liveBreak.key && session.endedAt === null)) {
+        nextSessions.push({
+          id: `${liveBreak.key}-${liveBreak.startedAt}`,
+          key: liveBreak.key,
+          minutes: 0,
+          startedAt: new Date(liveBreak.startedAt).toISOString(),
+          endedAt: null,
         });
+      }
+
+      return nextSessions;
+    });
+    setBreaks(() => {
+      const next = createInitialBreaks();
+
+      if (!record || record.checkOut !== "--") {
         return next;
+      }
+
+      breakConfigs.forEach((config) => {
+        const recordedMs = normalizedBreaks.totals[config.key] * 60_000;
+
+        if (liveBreak?.key === config.key) {
+          const liveElapsedMs = Math.max(0, Date.now() - liveBreak.startedAt);
+          next[config.key] = {
+            totalMs: Math.max(0, recordedMs - liveElapsedMs),
+            activeStart: liveBreak.startedAt,
+          };
+          return;
+        }
+
+        next[config.key] = { totalMs: recordedMs, activeStart: null };
       });
-    }
+
+      return next;
+    });
   }, []);
 
-  const buildBreakSnapshot = useCallback((state: BreakState, timestamp: number) => {
-    const summary = breakConfigs.reduce<Record<string, number>>((acc, config) => {
-      const entry = state[config.key];
-      const activeMs = entry.activeStart ? timestamp - entry.activeStart : 0;
-      acc[config.key] = Math.round((entry.totalMs + activeMs) / 60000);
-      return acc;
-    }, {});
-    const breakMinutes = Object.values(summary).reduce((sum, value) => sum + (value ?? 0), 0);
-    return { breakMinutes, breakSummary: summary };
-  }, []);
+  const buildBreakSnapshot = useCallback(
+    (
+      state: BreakState,
+      sessions: AttendanceBreakSession[],
+      timestamp: number,
+      closeOpenSessions = false,
+    ) => {
+      const summary = BREAK_KEYS.reduce(
+        (acc, key) => {
+          const entry = state[key];
+          const activeMs = entry.activeStart ? timestamp - entry.activeStart : 0;
+          acc[key] = Math.round((entry.totalMs + activeMs) / 60000);
+          return acc;
+        },
+        {} as Record<BreakKey, number>,
+      );
+      const normalizedSessions = sessions.map((session) => {
+        const activeStart = state[session.key].activeStart;
+        if (session.endedAt === null && activeStart) {
+          return {
+            ...session,
+            minutes: Math.max(0, Math.round((timestamp - activeStart) / 60000)),
+            endedAt: closeOpenSessions ? new Date(timestamp).toISOString() : null,
+          };
+        }
+        return session;
+      });
+      const breakMinutes = Object.values(summary).reduce((sum, value) => sum + (value ?? 0), 0);
+      return {
+        breakMinutes,
+        breakSummary: {
+          totals: summary,
+          sessions: normalizedSessions,
+        },
+      };
+    },
+    [],
+  );
 
   const persistAttendanceProgress = useCallback(
-    async (snapshot: { breakMinutes: number; breakSummary: Record<string, number> }) => {
+    async (snapshot: { breakMinutes: number; breakSummary: AttendanceRecord["breakSummary"] }) => {
       if (!checkInAt || attendanceBusy || !attendanceRecord || attendanceRecord.checkOut !== "--") {
         return;
       }
       const existingTotal = attendanceRecord.breakSummary
-        ? Object.values(attendanceRecord.breakSummary).reduce((sum, value) => sum + (value ?? 0), 0)
+        ? Object.values(normalizeBreakSummary(attendanceRecord.breakSummary).totals).reduce(
+            (sum, value) => sum + (value ?? 0),
+            0,
+          )
         : attendanceRecord.breakMinutes ?? 0;
       if (existingTotal > 0 && snapshot.breakMinutes === 0) {
         return;
@@ -312,18 +391,12 @@ export function AppTopbar({
   }, [loadTodayAttendance]);
 
   useEffect(() => {
-    if (!trackerOpen) {
-      setBreakMenuOpen(false);
-    }
-  }, [trackerOpen]);
-
-  useEffect(() => {
     if (!checkInAt || !attendanceRecord || attendanceRecord.checkOut !== "--") {
       return;
     }
-    const snapshot = buildBreakSnapshot(breaks, Date.now());
+    const snapshot = buildBreakSnapshot(breaks, breakSessions, Date.now());
     void persistAttendanceProgress(snapshot);
-  }, [attendanceRecord, breaks, buildBreakSnapshot, checkInAt, persistAttendanceProgress]);
+  }, [attendanceRecord, breaks, breakSessions, buildBreakSnapshot, checkInAt, persistAttendanceProgress]);
 
   const handleCheckInSelect = (mode: AttendanceCheckInMode) => {
     setCheckInMenuOpen(false);
@@ -356,7 +429,6 @@ export function AppTopbar({
     }
     setAttendanceBusy(true);
     setAttendanceError(null);
-    setBreakMenuOpen(false);
     setCheckInMenuOpen(false);
     setTrackerOpen(false);
     try {
@@ -364,6 +436,7 @@ export function AppTopbar({
       applyAttendanceRecord(record);
       setActiveBreak(null);
       setBreaks(createInitialBreaks());
+      setBreakSessions([]);
       writeLiveBreak(null);
     } catch (error) {
       setAttendanceError(error instanceof Error ? error.message : "Unable to check in.");
@@ -378,23 +451,20 @@ export function AppTopbar({
     }
     setAttendanceBusy(true);
     setAttendanceError(null);
-    setBreakMenuOpen(false);
     setCheckInMenuOpen(false);
     setTrackerOpen(false);
     try {
-      const breakSummary = breakConfigs.reduce<Record<string, number>>((acc, config) => {
-        acc[config.key] = Math.round(getBreakElapsed(config.key) / 60000);
-        return acc;
-      }, {});
+      const snapshot = buildBreakSnapshot(breaks, breakSessions, now, true);
       const timeOnSystemMinutes = Math.max(0, Math.round(timeOnSystemMs / 60000));
       const record = await hrService.markMyCheckOut({
-        breakMinutes: Math.round(totalBreakMs / 60000),
-        breakSummary,
+        breakMinutes: snapshot.breakMinutes,
+        breakSummary: snapshot.breakSummary,
         timeOnSystemMinutes,
       });
       applyAttendanceRecord(record);
       setActiveBreak(null);
       setBreaks(createInitialBreaks());
+      setBreakSessions([]);
       writeLiveBreak(null);
     } catch (error) {
       setAttendanceError(error instanceof Error ? error.message : "Unable to check out.");
@@ -408,7 +478,26 @@ export function AppTopbar({
       return;
     }
 
+    const targetConfig = breakConfigs.find((config) => config.key === key);
+    const sessionLimitReached =
+      activeBreak !== key &&
+      targetConfig?.sessionLimit !== null &&
+      targetConfig?.sessionLimit !== undefined &&
+      breakSessionCounts[key] >= targetConfig.sessionLimit;
+
+    if (sessionLimitReached) {
+      setAttendanceError(
+        `${targetConfig.label} can only be used ${targetConfig.sessionLimit} ${
+          targetConfig.sessionLimit === 1 ? "time" : "times"
+        } today.`,
+      );
+      return;
+    }
+
+    setAttendanceError(null);
+
     const nextActiveBreak = activeBreak === key ? null : key;
+    const nowIso = new Date(now).toISOString();
 
     setBreaks((prev) => {
       const next = { ...prev };
@@ -441,6 +530,32 @@ export function AppTopbar({
 
       return next;
     });
+    setBreakSessions((prev) => {
+      const next = prev.map((session) => {
+        if (activeBreak && session.key === activeBreak && session.endedAt === null) {
+          const startedAt = session.startedAt ? new Date(session.startedAt).getTime() : now;
+          return {
+            ...session,
+            minutes: Math.max(0, Math.round((now - startedAt) / 60000)),
+            endedAt: nowIso,
+          };
+        }
+
+        return session;
+      });
+
+      if (nextActiveBreak) {
+        next.push({
+          id: `${nextActiveBreak}-${now}`,
+          key: nextActiveBreak,
+          minutes: 0,
+          startedAt: nowIso,
+          endedAt: null,
+        });
+      }
+
+      return next;
+    });
 
     setActiveBreak(nextActiveBreak);
     if (nextActiveBreak) {
@@ -449,7 +564,6 @@ export function AppTopbar({
       writeLiveBreak(null);
     }
 
-    setBreakMenuOpen(false);
     setTrackerOpen(false);
   };
 
@@ -512,6 +626,7 @@ export function AppTopbar({
                   setTrackerOpen((value) => !value);
                   setCheckInMenuOpen(false);
                 }}
+                aria-expanded={trackerOpen}
                 className="time-tracker-trigger inline-flex items-center gap-2 rounded-full border border-brand-100 bg-[linear-gradient(135deg,#ffffff_0%,#eef6ff_55%,#ffffff_100%)] px-3 py-2 text-sm font-bold text-slate-900 shadow-[0_14px_30px_rgba(56,189,248,0.25)] transition hover:shadow-[0_18px_36px_rgba(56,189,248,0.3)] whitespace-nowrap dark:border-slate-700/60 dark:bg-[linear-gradient(135deg,#0b1224_0%,#1e293b_55%,#0f172a_100%)] dark:text-white"
               >
                 <Clock3 className="h-4 w-4 text-brand-700" />
@@ -521,6 +636,7 @@ export function AppTopbar({
                     <span className="tabular-nums text-xs font-black text-slate-700 dark:text-slate-300">
                       {formatDuration(activeBreakElapsed)}
                     </span>
+                    <ChevronDown className={`h-4 w-4 transition ${trackerOpen ? "rotate-180" : ""}`} />
                   </>
                 ) : (
                   <>
@@ -528,6 +644,7 @@ export function AppTopbar({
                     <span className="tabular-nums text-xs font-black text-slate-700 dark:text-slate-300">
                       {checkInAt ? formatDuration(timeOnSystemMs) : "00:00"}
                     </span>
+                    <ChevronDown className={`h-4 w-4 transition ${trackerOpen ? "rotate-180" : ""}`} />
                   </>
                 )}
               </button>
@@ -572,63 +689,73 @@ export function AppTopbar({
                     <p className="mt-3 text-xs font-semibold text-rose-600">{attendanceError}</p>
                   ) : null}
 
-                  <div className="mt-4 relative">
-                    <button
-                      type="button"
-                      onClick={() => setBreakMenuOpen((value) => !value)}
-                      disabled={!checkInAt}
-                      className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[0.68rem] font-black uppercase tracking-[0.2em] text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.08)] transition hover:shadow-[0_14px_26px_rgba(15,23,42,0.12)] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                    >
-                      <span>{activeBreakLabel ? `Break: ${activeBreakLabel}` : "Select break"}</span>
-                      <ChevronDown className={`h-4 w-4 transition ${breakMenuOpen ? "rotate-180" : ""}`} />
-                    </button>
+                  <div className="mt-4">
                     <span
-                      className={`mt-2 block text-xs font-semibold ${activeBreakLabel ? "text-amber-700" : "text-slate-500"}`}
+                      className={`block text-xs font-semibold ${
+                        activeBreakLabel ? "text-amber-700" : checkInAt ? "text-slate-500" : "text-slate-400"
+                      }`}
                     >
-                      {activeBreakLabel ? `Active: ${activeBreakLabel}` : "No active break"}
+                      {activeBreakLabel
+                        ? `Active: ${activeBreakLabel}`
+                        : checkInAt
+                          ? "Choose a break below."
+                          : "Check in first to start a break."}
                     </span>
 
-                    {breakMenuOpen ? (
-                      <div className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.14)] max-h-64 overflow-auto">
+                    <div className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/98 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.14)] max-h-64 overflow-auto">
                         <div className="flex flex-col gap-2">
-                          {breakConfigs.map((config) => {
-                            const isActive = activeBreak === config.key;
-                            const elapsed = isActive ? getBreakSessionElapsed(config.key) : getBreakElapsed(config.key);
-                            const overLimit =
-                              config.redAtMinutes !== undefined && elapsed >= config.redAtMinutes * 60_000;
-                            const variant = !checkInAt
-                              ? "disabled"
-                              : overLimit
-                                ? "limit"
-                                : isActive
-                                  ? "active"
-                                  : "neutral";
-                            const stateClasses = !checkInAt
-                              ? "border-slate-200 bg-slate-100 text-slate-400"
-                              : overLimit
-                                ? "border-rose-300 bg-[linear-gradient(135deg,#fee2e2,#fecaca)] text-rose-800 shadow-[0_8px_18px_rgba(244,63,94,0.2)]"
-                                : isActive
-                                  ? "border-amber-300 bg-[linear-gradient(135deg,#fef3c7,#fde68a)] text-amber-900 shadow-[0_8px_18px_rgba(245,158,11,0.25)]"
-                                  : "border-slate-200 bg-white text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_12px_22px_rgba(15,23,42,0.12)]";
+                        {breakConfigs.map((config) => {
+                          const isActive = activeBreak === config.key;
+                          const elapsed = isActive ? getBreakSessionElapsed(config.key) : getBreakElapsed(config.key);
+                          const sessionCount = breakSessionCounts[config.key];
+                          const sessionLimitReached =
+                            !isActive &&
+                            config.sessionLimit !== null &&
+                            sessionCount >= config.sessionLimit;
+                          const overLimit =
+                            config.redAtMinutes !== undefined && elapsed >= config.redAtMinutes * 60_000;
+                          const buttonDisabled = !checkInAt || sessionLimitReached;
+                          const variant = buttonDisabled
+                            ? "disabled"
+                            : overLimit
+                              ? "limit"
+                              : isActive
+                                ? "active"
+                                : "neutral";
+                          const stateClasses = buttonDisabled
+                            ? "border-slate-200 bg-slate-100 text-slate-400"
+                            : overLimit
+                              ? "border-rose-300 bg-[linear-gradient(135deg,#fee2e2,#fecaca)] text-rose-800 shadow-[0_8px_18px_rgba(244,63,94,0.2)]"
+                              : isActive
+                                ? "border-amber-300 bg-[linear-gradient(135deg,#fef3c7,#fde68a)] text-amber-900 shadow-[0_8px_18px_rgba(245,158,11,0.25)]"
+                                : "border-slate-200 bg-white text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.08)] hover:shadow-[0_12px_22px_rgba(15,23,42,0.12)]";
+                          const usageLabel =
+                            config.sessionLimit !== null
+                              ? `${Math.min(sessionCount, config.sessionLimit)}/${config.sessionLimit} used`
+                              : null;
 
-                            return (
-                              <button
-                                key={config.key}
-                                type="button"
-                                onClick={() => handleBreakToggle(config.key)}
-                                disabled={!checkInAt}
-                                className={`time-tracker-break time-tracker-break--${variant} flex flex-col items-start rounded-2xl border px-3 py-2 text-left text-[0.7rem] font-black uppercase tracking-[0.18em] transition ${stateClasses}`}
+                          return (
+                            <button
+                              key={config.key}
+                              type="button"
+                              onClick={() => handleBreakToggle(config.key)}
+                              disabled={buttonDisabled}
+                              className={`time-tracker-break time-tracker-break--${variant} flex flex-col items-start rounded-2xl border px-3 py-2 text-left text-[0.7rem] font-black uppercase tracking-[0.18em] transition ${stateClasses}`}
+                            >
+                              <span>{config.label}</span>
+                              <span
+                                className={`mt-1 text-xs font-semibold tracking-normal ${
+                                  buttonDisabled ? "text-slate-400" : "text-slate-500"
+                                }`}
                               >
-                                <span>{config.label}</span>
-                                <span className="mt-1 text-xs font-semibold tracking-normal text-slate-500">
-                                  {checkInAt ? formatDuration(elapsed) : "--:--"}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                                {checkInAt ? formatDuration(elapsed) : "--:--"}
+                                {usageLabel ? ` | ${usageLabel}` : ""}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
-                    ) : null}
+                    </div>
                   </div>
                 </div>
               </div>

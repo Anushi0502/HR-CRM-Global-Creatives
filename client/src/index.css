@@ -690,6 +690,19 @@ textarea {
     color: #ffffff !important;
   }
 
+  :root[data-theme="dark"] .segmented-control button {
+    color: rgba(226, 232, 240, 0.82) !important;
+  }
+
+  :root[data-theme="dark"] .segmented-control button:hover {
+    color: #f8fafc !important;
+  }
+
+  :root[data-theme="dark"] .segmented-control .segmented-active {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+
   [class*="placeholder:text-slate-"]::placeholder,
   input::placeholder,
   textarea::placeholder {
