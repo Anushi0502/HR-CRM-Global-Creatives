@@ -18,19 +18,21 @@ export function PageHeader({
   badgeIcon,
 }: PageHeaderProps) {
   return (
-    <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <header className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div className="min-w-0">
-        {eyebrow ? <span className="sr-only">{eyebrow}</span> : null}
+        {eyebrow ? <p className="mb-1 text-[0.6rem] font-black uppercase tracking-[0.2em] text-brand-700">{eyebrow}</p> : null}
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-950 tracking-tight leading-none">{title}</h1>
+        <p className="mt-2 text-sm font-bold text-slate-500 max-w-2xl leading-relaxed">{subtitle}</p>
         {badge ? (
-          <span className="mb-2 inline-flex w-fit items-center gap-2 rounded-full border border-slate-200/70 bg-white/80 px-3 py-1 text-[0.62rem] font-black uppercase tracking-[0.28em] text-slate-700 shadow-[0_10px_20px_rgba(15,23,42,0.08)]">
-            {badgeIcon ? <span className="text-slate-600">{badgeIcon}</span> : null}
-            {badge}
-          </span>
+          <div className="mt-3 flex">
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[0.6rem] font-black uppercase tracking-widest text-slate-700 shadow-sm">
+              {badgeIcon ? <span className="text-slate-400">{badgeIcon}</span> : null}
+              {badge}
+            </span>
+          </div>
         ) : null}
-        <h1 className="text-4xl font-semibold text-slate-950">{title}</h1>
-        <p className="mt-1 text-sm font-medium text-slate-700">{subtitle}</p>
       </div>
-      {action ? <div className="flex flex-wrap gap-2">{action}</div> : null}
+      {action ? <div className="flex flex-wrap items-center gap-2 shrink-0">{action}</div> : null}
     </header>
   );
 }

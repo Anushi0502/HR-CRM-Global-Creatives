@@ -10,23 +10,35 @@ interface ModuleHeroProps {
 
 export function ModuleHero({ icon: Icon, title, subtitle, chips, spotlight }: ModuleHeroProps) {
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-brand-200/70 bg-white p-5 shadow-soft">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.22),transparent_42%)]" />
-      <div className="flex items-start gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-          <Icon className="h-4 w-4" />
-        </span>
-        <div className="relative">
-          <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
-          <p className="mt-1 text-sm font-medium text-slate-700">{subtitle}</p>
+    <section className="hero-panel relative overflow-hidden rounded-2xl border p-5 sm:p-6 lg:p-7 text-white shadow-panel">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_35%)] pointer-events-none" />
+      
+      <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-start gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm text-white shadow-lg">
+            <Icon className="h-6 w-6" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">{title}</h3>
+            <p className="mt-1.5 text-sm font-medium text-white/80 max-w-2xl leading-relaxed">{subtitle}</p>
+            
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {chips.map((chip, idx) => (
+                <span key={idx} className="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-[0.6rem] font-black uppercase tracking-widest text-white/90">
+                  {chip}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
+        
+        {spotlight ? (
+          <div className="shrink-0 flex flex-col items-start md:items-end gap-1">
+            <p className="text-[0.6rem] font-black uppercase tracking-[0.2em] text-white/60">Insight</p>
+            <p className="text-lg font-black tracking-tight text-white">{spotlight}</p>
+          </div>
+        ) : null}
       </div>
-      {chips.length > 0 ? (
-        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-brand-800">
-          {chips.join(" · ")}
-        </p>
-      ) : null}
-      {spotlight ? <p className="mt-2 text-sm font-semibold text-brand-900">{spotlight}</p> : null}
     </section>
   );
 }

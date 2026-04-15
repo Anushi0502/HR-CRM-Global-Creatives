@@ -1,7 +1,6 @@
 import { useCallback } from "react";
-import { CalendarRange, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { LeaveCalendar } from "../components/LeaveCalendar";
-import { ModuleHero } from "../components/ModuleHero";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
 import { useApi } from "../hooks/useApi";
@@ -17,14 +16,6 @@ export function LeaveCalendarPage() {
         title="Leave Coverage Calendar"
         subtitle="Spot overlapping leave days and coverage risk before approvals land."
         eyebrow="Coverage Planning"
-      />
-
-      <ModuleHero
-        icon={CalendarRange}
-        title="Balance Leave Decisions With Real Coverage Data"
-        subtitle="Monitor overlap by department and prioritize staffing gaps before approving time off."
-        chips={["Overlap alerts", "Department view", "Risk signals"]}
-        spotlight="Live coverage map"
       />
 
       <SectionCard title="Monthly Coverage View" subtitle="Department-level overlap and risk heat"> 

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -8,6 +8,8 @@ import {
   Clock3,
   Home,
   Info,
+  PencilLine,
+  Send,
   TimerReset,
   UserRoundCheck,
   UserRoundX,
@@ -24,7 +26,11 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useApi } from "../hooks/useApi";
 import { useAuthSession } from "../hooks/useAuthSession";
 import { hrService, isNewUserEmployeeSetupError } from "../services/hrService";
-import type { AttendanceBreakKey, AttendanceRecord } from "../types/hr";
+import type {
+  AttendanceBreakKey,
+  AttendanceCorrectionRequestPayload,
+  AttendanceRecord,
+} from "../types/hr";
 import {
   BREAK_CONFIGS as breakPolicies,
   LIVE_BREAK_STORAGE_KEY,
@@ -45,6 +51,16 @@ export function EmployeeAttendancePage() {
   const [showLateOnly, setShowLateOnly] = useState(false);
   const [showBreakOnly, setShowBreakOnly] = useState(false);
   const [liveBreak, setLiveBreak] = useState<{ key: BreakKey; startedAt: number } | null>(null);
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [correctionDraft, setCorrectionDraft] = useState<AttendanceCorrectionRequestPayload>({
+    date: todayKey,
+    checkIn: "--",
+    checkOut: "--",
+    reason: "",
+  });
+  const [correctionSubmitting, setCorrectionSubmitting] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [correctionMessage, setCorrectionMessage] = useState<string | null>(null);
   const holidayHook = useApi(
     useCallback(() => hrService.getHolidayDatesForMonth(calendarMonth), [calendarMonth]),
   );
@@ -158,6 +174,19 @@ export function EmployeeAttendancePage() {
     }
     return total;
   }, [calendarMonth, cutoffDay]);
+
+  const totalWorkingDaysInMonth = useMemo(() => {
+    let total = 0;
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day);
+      const weekday = date.getDay();
+      if (weekday !== 0 && weekday !== 6) {
+        total += 1;
+      }
+    }
+    return total;
+  }, [calendarMonth, daysInMonth]);
+
   const totalDaysForAbsence = Math.max(0, cutoffDay - weekendDaysInMonth);
   const presentByFormula = useMemo(() => {
     return Math.max(0, monthStats.present + monthStats.late + monthStats.remote);
@@ -165,6 +194,11 @@ export function EmployeeAttendancePage() {
   const absentByFormula = useMemo(() => {
     return Math.max(0, totalDaysForAbsence - presentByFormula);
   }, [presentByFormula, totalDaysForAbsence]);
+
+  const formatWorkingDayRatio = useCallback(
+    (value: number) => `${value} / ${totalWorkingDaysInMonth}`,
+    [totalWorkingDaysInMonth],
+  );
 
   const formatMinutes = (minutes: number) => {
     if (!minutes) return "0m";
@@ -411,6 +445,53 @@ export function EmployeeAttendancePage() {
   const selectedBreakMinutes = selectedBreakInfo.totalMinutes;
   const selectedBreakCount = selectedBreakEntries.length;
   const selectedWorkMinutes = selectedRecord?.timeOnSystemMinutes ?? 0;
+  const canRequestCorrection =
+    Boolean(selectedDateKey) &&
+    selectedStatus !== "weekend" &&
+    selectedStatus !== "holiday" &&
+    selectedStatus !== "upcoming";
+
+  const openCorrectionModal = () => {
+    if (!selectedDateKey) {
+      return;
+    }
+
+    setCorrectionDraft({
+      date: selectedDateKey,
+      checkIn: selectedRecord?.checkIn ?? "--",
+      checkOut: selectedRecord?.checkOut ?? "--",
+      reason: "",
+    });
+    setCorrectionError(null);
+    setShowCorrectionModal(true);
+  };
+
+  const handleCorrectionDraftChange = (
+    field: keyof AttendanceCorrectionRequestPayload,
+    value: string,
+  ) => {
+    setCorrectionError(null);
+    setCorrectionDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleSubmitCorrectionRequest = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCorrectionSubmitting(true);
+    setCorrectionError(null);
+
+    try {
+      await hrService.createCorrectionRequest(correctionDraft);
+      setCorrectionMessage(`Correction request submitted for ${formatDate(correctionDraft.date)}.`);
+      setShowCorrectionModal(false);
+    } catch (error) {
+      setCorrectionError(error instanceof Error ? error.message : "Unable to submit correction request.");
+    } finally {
+      setCorrectionSubmitting(false);
+    }
+  };
 
   const columns: Array<TableColumn<AttendanceRecord>> = [
     { key: "date", header: "Date", render: (row) => formatDate(row.date) },
@@ -435,13 +516,18 @@ export function EmployeeAttendancePage() {
 
       {recordsHook.loading ? <p className="text-sm font-semibold text-brand-700">Loading attendance summary...</p> : null}
       {recordsHook.error ? <p className="text-sm font-semibold text-rose-700">{recordsHook.error}</p> : null}
+      {correctionMessage ? (
+        <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+          {correctionMessage}
+        </p>
+      ) : null}
 
       {!recordsHook.loading && !recordsHook.error ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard title="Present" value={String(presentByFormula)} icon={UserRoundCheck} />
+          <StatCard title="Present" value={formatWorkingDayRatio(presentByFormula)} icon={UserRoundCheck} />
           <StatCard title="Remote" value={String(monthStats.remote)} icon={Home} />
-          <StatCard title="Late" value={String(monthStats.late)} icon={Clock3} />
-          <StatCard title="Absent" value={String(absentByFormula)} icon={UserRoundX} />
+          <StatCard title="Late" value={formatWorkingDayRatio(monthStats.late)} icon={Clock3} />
+          <StatCard title="Absent" value={formatWorkingDayRatio(absentByFormula)} icon={UserRoundX} />
         </div>
       ) : null}
 
@@ -452,13 +538,13 @@ export function EmployeeAttendancePage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
                 Present days
               </p>
-              <p className="mt-2 text-3xl font-bold text-slate-950 dark:text-white">{presentByFormula}</p>
+              <p className="mt-2 text-3xl font-bold text-slate-950 dark:text-white">{formatWorkingDayRatio(presentByFormula)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
                 Late days
               </p>
-              <p className="mt-2 text-3xl font-bold text-amber-600 dark:text-amber-300">{monthStats.late}</p>
+              <p className="mt-2 text-3xl font-bold text-amber-600 dark:text-amber-300">{formatWorkingDayRatio(monthStats.late)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/80">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
@@ -472,7 +558,7 @@ export function EmployeeAttendancePage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
                 Absents
               </p>
-              <p className="mt-2 text-3xl font-bold text-rose-600 dark:text-rose-300">{absentByFormula}</p>
+              <p className="mt-2 text-3xl font-bold text-rose-600 dark:text-rose-300">{formatWorkingDayRatio(absentByFormula)}</p>
             </div>
           </div>
 
@@ -483,6 +569,8 @@ export function EmployeeAttendancePage() {
                 onClick={() =>
                   setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
                 }
+                aria-label="Previous month"
+                title="Previous month"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-slate-700/60 dark:bg-slate-900/80 dark:text-slate-200"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -535,6 +623,8 @@ export function EmployeeAttendancePage() {
                 onClick={() =>
                   setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
                 }
+                aria-label="Next month"
+                title="Next month"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm transition hover:-translate-y-0.5 dark:border-slate-700/60 dark:bg-slate-900/80 dark:text-slate-200"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -715,6 +805,17 @@ export function EmployeeAttendancePage() {
                   </p>
                   <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{selectedStatusLabel}</p>
                 </div>
+
+                {canRequestCorrection ? (
+                  <button
+                    type="button"
+                    onClick={openCorrectionModal}
+                    className="btn-secondary w-full justify-center"
+                  >
+                    <PencilLine className="h-4 w-4" />
+                    Request correction
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -734,6 +835,106 @@ export function EmployeeAttendancePage() {
           emptyText="No attendance records available."
         />
       </SectionCard>
+
+      {showCorrectionModal ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-[28px] border border-slate-200 bg-white shadow-panel">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+              <div>
+                <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-brand-700">
+                  Attendance Support
+                </p>
+                <h2 className="mt-2 text-xl font-black tracking-tight text-slate-950">
+                  Request an attendance correction
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Submit the correct timings and a short note for admin review.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCorrectionModal(false)}
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitCorrectionRequest} className="space-y-4 px-6 py-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-400">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={correctionDraft.date}
+                    onChange={(event) => handleCorrectionDraftChange("date", event.target.value)}
+                    className="input-surface w-full"
+                  />
+                </div>
+                <div className="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800">
+                  Admin will compare your request with the existing record before applying changes.
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-400">
+                    Correct check-in
+                  </label>
+                  <input
+                    value={correctionDraft.checkIn}
+                    onChange={(event) => handleCorrectionDraftChange("checkIn", event.target.value)}
+                    placeholder="09:00 or --"
+                    className="input-surface w-full"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-400">
+                    Correct check-out
+                  </label>
+                  <input
+                    value={correctionDraft.checkOut}
+                    onChange={(event) => handleCorrectionDraftChange("checkOut", event.target.value)}
+                    placeholder="18:00 or --"
+                    className="input-surface w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-slate-400">
+                  Reason
+                </label>
+                <textarea
+                  value={correctionDraft.reason}
+                  onChange={(event) => handleCorrectionDraftChange("reason", event.target.value)}
+                  placeholder="Explain what was missed or recorded incorrectly."
+                  rows={4}
+                  className="input-surface w-full resize-none"
+                />
+              </div>
+
+              {correctionError ? (
+                <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                  {correctionError}
+                </p>
+              ) : null}
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => setShowCorrectionModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" disabled={correctionSubmitting} className="btn-primary">
+                  <Send className="h-4 w-4" />
+                  {correctionSubmitting ? "Submitting..." : "Submit request"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

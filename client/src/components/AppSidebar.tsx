@@ -11,32 +11,32 @@ interface AppSidebarProps {
 export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
   const navItems = items.filter((item) => !item.footerOnly);
   return (
-    <aside className="app-sidebar relative hidden w-[248px] shrink-0 overflow-hidden border-r lg:flex lg:flex-col">
+    <aside className="app-sidebar relative hidden w-[240px] xl:w-[260px] shrink-0 overflow-hidden border-r lg:flex lg:flex-col">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.26),transparent_34%)]" />
 
-      <div className="relative border-b border-white/18 px-5 py-5">
-        <div className="space-y-4">
-          <div className="sidebar-brand-pill rounded-[24px] border px-4 py-3 backdrop-blur-sm">
+      <div className="relative border-b border-white/10 px-5 py-4 short:py-3">
+        <div className="space-y-4 short:space-y-2">
+          <div className="sidebar-brand-pill rounded-2xl border px-4 py-2.5 backdrop-blur-sm shadow-sm transition-all hover:shadow-md">
             <BrandLogo size="md" variant="plain" />
           </div>
           <div className="px-1">
-            <p className="text-lg font-bold text-white/78">{workspaceLabel}</p>
+            <p className="text-base xl:text-lg font-black text-white leading-tight">{workspaceLabel}</p>
           </div>
         </div>
       </div>
 
-      <div className="relative px-4 py-4">
-        <nav className="mt-3 space-y-1">
+      <div className="relative flex-1 overflow-y-auto px-3 py-4 custom-scrollbar">
+        <nav className="space-y-1">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
                 clsx(
-                  "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition",
+                  "group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-bold transition-all duration-200",
                   isActive
-                    ? "bg-white text-brand-950 shadow-[0_18px_36px_rgba(0,86,143,0.18)]"
-                    : "text-white/95 hover:bg-white/14 hover:text-white",
+                    ? "bg-white text-brand-950 shadow-[0_12px_24px_rgba(0,0,0,0.1)] translate-x-1"
+                    : "text-white/80 hover:bg-white/10 hover:text-white",
                 )
               }
             >
@@ -44,15 +44,17 @@ export function AppSidebar({ items, workspaceLabel }: AppSidebarProps) {
                 <>
                   <span
                     className={clsx(
-                      "flex h-9 w-9 items-center justify-center rounded-xl transition",
+                      "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
                       isActive
-                        ? "bg-brand-100 text-brand-950"
-                        : "bg-white/12 text-white group-hover:bg-white/22 group-hover:text-white",
+                        ? "bg-brand-50 text-brand-950 shadow-sm"
+                        : "bg-white/5 text-white/70 group-hover:bg-white/15 group-hover:text-white",
                     )}
                   >
                     <item.icon className="h-4 w-4" />
                   </span>
-                  <span className={clsx("truncate", isActive ? "!text-brand-950" : "!text-white")}>{item.label}</span>
+                  <span className={clsx("truncate font-black tracking-tight", isActive ? "text-brand-950" : "text-white")}>
+                    {item.label}
+                  </span>
                 </>
               )}
             </NavLink>

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ClipboardList, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { DataTable } from "../components/DataTable";
 import type { TableColumn } from "../components/DataTable";
-import { ModuleHero } from "../components/ModuleHero";
 import { NewUserSetupModal } from "../components/NewUserSetupModal";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
@@ -198,13 +197,6 @@ export function TasksPage() {
         title="Task Command"
         subtitle=""
         eyebrow="Task Center"
-      />
-
-      <ModuleHero
-        icon={ClipboardList}
-        title="Task list"
-        subtitle="Create a task, assign it, and update status in one place."
-        chips={[]}
       />
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1.8fr]">

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { ChartNetwork, Filter, RotateCcw, Users } from "lucide-react";
-import { ModuleHero } from "../components/ModuleHero";
+import { Filter, RotateCcw, Users } from "lucide-react";
 import { OrgChartTree } from "../components/OrgChartTree";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
@@ -94,14 +93,6 @@ export function OrgChartPage() {
         title="Org Chart"
         subtitle="Map reporting lines, manager coverage, and team distribution at a glance"
         eyebrow="People structure"
-      />
-
-      <ModuleHero
-        icon={ChartNetwork}
-        title="See Every Manager, Team, and Reporting Line in One Place"
-        subtitle="Filter by department, status, or manager focus to isolate leadership coverage and spot coverage gaps quickly."
-        chips={["Manager radar", "Team structure", "Coverage visibility"]}
-        spotlight={`${managerCount} Active Managers`}
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

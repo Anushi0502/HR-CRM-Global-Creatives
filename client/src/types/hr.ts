@@ -4,6 +4,8 @@ export type AttendanceBreakKey = "bio" | "lunch" | "tea" | "meetingTraining";
 export type ShiftCode = "shift_1" | "shift_2" | "shift_3";
 export type ShiftApprovalStatus = "pending" | "approved";
 export type LeaveStatus = "approved" | "pending" | "rejected";
+export type AdminRequestType = "attendance_correction" | "leave_cancellation" | "profile_update";
+export type AdminRequestStatus = "pending" | "approved" | "rejected";
 export type CandidateStage = "sourced" | "interview" | "offer" | "hired" | "rejected";
 export type PayrollStatus = "processed" | "scheduled";
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
@@ -137,6 +139,27 @@ export interface LeaveRequest {
   reason: string;
   status: LeaveStatus;
   compensated: boolean;
+}
+
+export interface AttendanceCorrectionRequestPayload {
+  date: string;
+  checkIn: string;
+  checkOut: string;
+  reason: string;
+}
+
+export type AdminRequestPayload = AttendanceCorrectionRequestPayload | Record<string, unknown>;
+
+export interface AdminRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  type: AdminRequestType;
+  payload: AdminRequestPayload;
+  reason: string;
+  status: AdminRequestStatus;
+  createdAt: string;
+  adminComment: string | null;
 }
 
 export interface Candidate {

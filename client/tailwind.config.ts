@@ -45,6 +45,10 @@ const config: Config = {
       borderRadius: {
         xl2: "1.25rem",
       },
+      screens: {
+        short: { raw: "(max-height: 800px)" },
+        xshort: { raw: "(max-height: 700px)" },
+      },
       backgroundImage: {
         "brand-gradient": "linear-gradient(138deg, #ffffff 0%, #cfeeff 42%, #0095ff 100%)",
       },

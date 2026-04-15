@@ -8,6 +8,7 @@ import {
   Flag,
   Send,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { DataTable } from "../components/DataTable";
 import type { TableColumn } from "../components/DataTable";
@@ -36,6 +37,16 @@ export function EmployeeLeavePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Delete this pending leave request?")) return;
+    try {
+      await hrService.deleteMyLeaveRequest(id);
+      await leaveHook.refetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed.");
+    }
+  };
+
   const stats = useMemo(() => {
     const rows = leaveHook.data ?? [];
 
@@ -54,12 +65,21 @@ export function EmployeeLeavePage() {
   }
 
   const columns: Array<TableColumn<LeaveRequest>> = [
-    { key: "type", header: "Type", render: (row) => row.leaveType.toUpperCase() },
-    { key: "start", header: "Start", render: (row) => formatDate(row.startDate) },
-    { key: "end", header: "End", render: (row) => formatDate(row.endDate) },
-    { key: "days", header: "Days", render: (row) => row.days },
-    { key: "reason", header: "Reason", render: (row) => row.reason },
+    { key: "type", header: "Type", render: (row) => <span className="font-bold text-slate-700">{row.leaveType.toUpperCase()}</span> },
+    { key: "start", header: "Start", render: (row) => <span className="text-xs font-bold text-slate-500">{formatDate(row.startDate)}</span> },
+    { key: "end", header: "End", render: (row) => <span className="text-xs font-bold text-slate-500">{formatDate(row.endDate)}</span> },
+    { key: "days", header: "Days", render: (row) => <span className="font-black text-brand-700">{row.days}</span> },
+    { key: "reason", header: "Reason", render: (row) => <p className="text-sm font-medium text-slate-600 truncate max-w-[200px]">{row.reason}</p> },
     { key: "status", header: "Status", render: (row) => <StatusBadge value={row.status} /> },
+    {
+      key: "actions",
+      header: "",
+      render: (row) => row.status === "pending" ? (
+        <button onClick={() => handleDelete(row.id)} className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-600 transition" title="Delete request">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      ) : null,
+    },
   ];
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -81,9 +101,9 @@ export function EmployeeLeavePage() {
   return (
     <div className="animate-page-enter space-y-6">
       <PageHeader
-        title="My Leave"
+        title="Leave"
         subtitle=""
-        eyebrow="Employee Leave"
+        eyebrow="Personal"
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

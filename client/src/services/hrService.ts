@@ -1,8 +1,13 @@
 import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/functions-js";
 import type {
+  AdminRequest,
+  AdminRequestPayload,
+  AdminRequestStatus,
+  AdminRequestType,
   AdminCommandCenter,
   Announcement,
   AnnouncementAudience,
+  AttendanceCorrectionRequestPayload,
   AttendanceCheckInMode,
   AttendanceRecord,
   AttendanceSummary,
@@ -103,6 +108,18 @@ interface LeaveRequestRow {
   reason: string;
   status: LeaveRequest["status"];
   compensated: boolean | null;
+}
+
+interface RequestRow {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  type: AdminRequestType;
+  payload: AdminRequestPayload | null;
+  reason: string;
+  status: AdminRequestStatus;
+  created_at: string;
+  admin_comment: string | null;
 }
 
 interface CandidateRow {
@@ -496,6 +513,36 @@ function toLeaveRequest(row: LeaveRequestRow): LeaveRequest {
     status: row.status,
     compensated: Boolean(row.compensated),
   };
+}
+
+function toAdminRequest(row: RequestRow): AdminRequest {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    employeeName: row.employee_name,
+    type: row.type,
+    payload: row.payload ?? {},
+    reason: row.reason,
+    status: row.status,
+    createdAt: row.created_at,
+    adminComment: row.admin_comment,
+  };
+}
+
+function isAttendanceCorrectionPayload(
+  payload: AdminRequestPayload | null | undefined,
+): payload is AttendanceCorrectionRequestPayload {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  const value = payload as Record<string, unknown>;
+  return (
+    typeof value.date === "string" &&
+    typeof value.checkIn === "string" &&
+    typeof value.checkOut === "string" &&
+    typeof value.reason === "string"
+  );
 }
 
 function toCandidate(row: CandidateRow): Candidate {
@@ -1952,6 +1999,139 @@ export const hrService = {
     throwIfError(error, "leave request create");
 
     return toLeaveRequest(data as LeaveRequestRow);
+  },
+
+  deleteMyLeaveRequest: async (id: string): Promise<void> => {
+    const client = assertSupabase();
+    const employee = await hrService.getCurrentEmployee();
+    const { error } = await client
+      .from("leave_requests")
+      .delete()
+      .eq("id", id)
+      .eq("employee_id", employee.id)
+      .eq("status", "pending");
+    throwIfError(error, "leave request delete");
+  },
+
+  createCorrectionRequest: async (payload: AttendanceCorrectionRequestPayload): Promise<AdminRequest> => {
+    const client = assertSupabase();
+    const employee = await hrService.getCurrentEmployee();
+    const normalizedPayload: AttendanceCorrectionRequestPayload = {
+      ...payload,
+      reason: payload.reason.trim(),
+    };
+
+    if (!normalizedPayload.date) {
+      throw new Error("Choose the attendance date that needs correction.");
+    }
+
+    if (!normalizedPayload.reason) {
+      throw new Error("Add a short note so the admin can review your correction request.");
+    }
+
+    const { data: existingRequests, error: existingRequestsError } = await client
+      .from("requests")
+      .select("id, payload")
+      .eq("employee_id", employee.id)
+      .eq("type", "attendance_correction")
+      .eq("status", "pending");
+
+    throwIfError(existingRequestsError, "correction request duplicate check");
+
+    const hasDuplicatePendingRequest = (existingRequests ?? []).some((requestRow) => {
+      const requestPayload = (requestRow as { payload?: AdminRequestPayload | null }).payload;
+      return isAttendanceCorrectionPayload(requestPayload) && requestPayload.date === normalizedPayload.date;
+    });
+
+    if (hasDuplicatePendingRequest) {
+      throw new Error("A correction request for this date is already pending review.");
+    }
+
+    const row = {
+      id: createId("REQ"),
+      employee_id: employee.id,
+      employee_name: employee.name,
+      type: "attendance_correction",
+      payload: normalizedPayload,
+      reason: normalizedPayload.reason,
+      status: "pending",
+    };
+
+    const { data, error } = await client.from("requests").insert(row).select("*").single();
+    throwIfError(error, "correction request create");
+    return toAdminRequest(data as RequestRow);
+  },
+
+  getRequests: async (): Promise<AdminRequest[]> => {
+    const client = assertSupabase();
+    const { data, error } = await client
+      .from("requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+    throwIfError(error, "requests fetch");
+    return (data ?? []).map((row) => toAdminRequest(row as RequestRow));
+  },
+
+  updateRequestStatus: async (id: string, status: "approved" | "rejected", comment?: string): Promise<void> => {
+    const client = assertSupabase();
+    const { data: request, error: fetchError } = await client.from("requests").select("*").eq("id", id).single();
+    throwIfError(fetchError, "request fetch");
+
+    const requestRow = request as RequestRow;
+
+    if (status === "approved" && requestRow.type === "attendance_correction" && isAttendanceCorrectionPayload(requestRow.payload)) {
+      const p = requestRow.payload;
+      const correctedStatus: AttendanceRecord["status"] =
+        p.checkIn === "--" && p.checkOut === "--" ? "absent" : "present";
+      const toTimestamp = (value: string) => (value === "--" ? null : new Date(`${p.date}T${value}:00`).toISOString());
+
+      const { data: existing, error: existingError } = await client
+        .from("attendance_records")
+        .select("id")
+        .eq("employee_id", requestRow.employee_id)
+        .eq("date", p.date)
+        .maybeSingle();
+
+      throwIfError(existingError, "attendance correction lookup");
+      
+      const updateData = {
+        check_in: p.checkIn,
+        check_out: p.checkOut,
+        status: correctedStatus,
+        check_in_at: toTimestamp(p.checkIn),
+        check_out_at: toTimestamp(p.checkOut),
+      };
+
+      if (existing) {
+        const { error: updateError } = await client
+          .from("attendance_records")
+          .update(updateData)
+          .eq("id", existing.id);
+        throwIfError(updateError, "attendance correction apply");
+      } else {
+        const { error: insertError } = await client.from("attendance_records").insert({
+          id: createId("ATT"),
+          employee_id: requestRow.employee_id,
+          employee_name: requestRow.employee_name,
+          date: p.date,
+          ...updateData
+        });
+        throwIfError(insertError, "attendance correction apply");
+      }
+    }
+
+    const { error } = await client
+      .from("requests")
+      .update({ status, admin_comment: comment?.trim() || null })
+      .eq("id", id);
+    throwIfError(error, "request status update");
+  },
+
+  autoCheckoutStaleSessions: async (): Promise<number> => {
+    const client = assertSupabase();
+    const { data, error } = await client.rpc("auto_checkout_stale_sessions");
+    throwIfError(error, "auto checkout call");
+    return data || 0;
   },
 
   getMyPayrollRecords: async (): Promise<PayrollRecord[]> => {

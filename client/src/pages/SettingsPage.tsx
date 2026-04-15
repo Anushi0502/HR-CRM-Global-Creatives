@@ -10,10 +10,8 @@ import {
   Landmark,
   RotateCcw,
   Save,
-  ShieldCheck,
   Workflow,
 } from "lucide-react";
-import { ModuleHero } from "../components/ModuleHero";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
 import { StatCard } from "../components/StatCard";
@@ -348,14 +346,6 @@ export function SettingsPage() {
             </button>
           </>
         }
-      />
-
-      <ModuleHero
-        icon={ShieldCheck}
-        title="Policy and operations control center"
-        subtitle="Move from passive settings review to active policy design with templates, dirty-state tracking, save/reset controls, risk analysis, and an operational memo generated from the draft configuration."
-        chips={["Draft mode", "Risk radar", "Export + memo"]}
-        spotlight={`${derived.weeklyHours} hrs/week across ${derived.workingDayCount} working days`}
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

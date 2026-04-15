@@ -2,19 +2,18 @@ import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
-  Archive,
   Briefcase,
-  Clock3,
-  Filter,
-  MapPin,
+  ChevronUp,
+  LayoutGrid,
   PencilLine,
-  Plus,
   RotateCcw,
+  Search,
   Star,
   Trash2,
   UserCheck,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 import { DataTable } from "../components/DataTable";
 import type { TableColumn } from "../components/DataTable";
@@ -25,12 +24,11 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useApi } from "../hooks/useApi";
 import { hrService } from "../services/hrService";
 import type { Employee, NewEmployeePayload, UpdateEmployeePayload } from "../types/hr";
-import { formatDate, getInitials } from "../utils/formatters";
+import { getInitials } from "../utils/formatters";
 import {
   DEFAULT_SHIFT_APPROVAL_STATUS,
   DEFAULT_SHIFT_CODE,
   SHIFT_DEFINITIONS,
-  formatShiftLabel,
 } from "../utils/shifts";
 
 const initialForm: NewEmployeePayload = {
@@ -64,64 +62,21 @@ type SortMode = "recent" | "performance" | "name" | "manager";
 
 function getDaysSince(dateValue: string): number {
   const stamp = new Date(dateValue);
-  if (Number.isNaN(stamp.valueOf())) {
-    return 0;
-  }
-
+  if (Number.isNaN(stamp.valueOf())) return 0;
   return Math.max(Math.floor((Date.now() - stamp.valueOf()) / DAY_IN_MS), 0);
 }
 
-function formatTenure(dateValue: string): string {
-  const days = getDaysSince(dateValue);
-  if (days < 45) {
-    return `${days} days`;
-  }
-
-  if (days < 365) {
-    return `${Math.max(Math.round(days / 30), 1)} months`;
-  }
-
-  return `${(days / 365).toFixed(1)} yrs`;
-}
-
-function formatAverageTos(minutes: number): string {
-  if (!minutes || minutes <= 0) {
-    return "--";
-  }
-  const hours = Math.floor(minutes / 60);
-  const remaining = minutes % 60;
-  return `${hours}h ${String(remaining).padStart(2, "0")}m`;
-}
-
 function getEmployeePriority(employee: Employee): "high" | "medium" | "normal" {
-  if (employee.status === "inactive" || employee.performanceScore < 70) {
-    return "high";
-  }
-
-  if (employee.status === "on_leave" || employee.performanceScore < 82) {
-    return "medium";
-  }
-
+  if (employee.status === "inactive" || employee.performanceScore < 70) return "high";
+  if (employee.status === "on_leave" || employee.performanceScore < 82) return "medium";
   return "normal";
 }
 
 function getRecommendation(employee: Employee): string {
-  if (employee.status === "inactive") {
-    return "Confirm whether the profile should remain archived or be fully removed.";
-  }
-
-  if (employee.status === "on_leave") {
-    return "Review coverage and check handoff readiness with the reporting manager.";
-  }
-
-  if (employee.performanceScore < 70) {
-    return "Schedule a coaching checkpoint and align on a short recovery plan.";
-  }
-
-  if (employee.performanceScore >= 92) {
-    return "Strong candidate for stretch assignments, promotion review, or mentorship.";
-  }
-
+  if (employee.status === "inactive") return "Confirm whether the profile should remain archived or be fully removed.";
+  if (employee.status === "on_leave") return "Review coverage and check handoff readiness with the reporting manager.";
+  if (employee.performanceScore < 70) return "Schedule a coaching checkpoint and align on a short recovery plan.";
+  if (employee.performanceScore >= 92) return "Strong candidate for stretch assignments, promotion review, or mentorship.";
   return "Current assignment looks stable. Keep role, manager, and location aligned.";
 }
 
@@ -138,11 +93,12 @@ export function EmployeesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
-  const [updateError, setUpdateError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<"archive" | "delete" | "status" | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
-  const { data, loading, error, refetch } = useApi(useCallback(() => hrService.getEmployees(), []));
+  const { data, loading, refetch } = useApi(useCallback(() => hrService.getEmployees(), []));
 
   const allEmployees = useMemo(() => data ?? [], [data]);
   const presetScopedEmployees = useMemo(() => {
@@ -176,23 +132,12 @@ export function EmployeesPage() {
 
   const filteredEmployees = useMemo(() => {
     const next = presetScopedEmployees.filter((employee) => (department ? employee.department === department : true));
-
     next.sort((left, right) => {
-      if (sortMode === "performance") {
-        return right.performanceScore - left.performanceScore;
-      }
-
-      if (sortMode === "name") {
-        return left.name.localeCompare(right.name);
-      }
-
-      if (sortMode === "manager") {
-        return left.manager.localeCompare(right.manager) || left.name.localeCompare(right.name);
-      }
-
+      if (sortMode === "performance") return right.performanceScore - left.performanceScore;
+      if (sortMode === "name") return left.name.localeCompare(right.name);
+      if (sortMode === "manager") return left.manager.localeCompare(right.manager) || left.name.localeCompare(right.name);
       return new Date(right.joinDate).valueOf() - new Date(left.joinDate).valueOf();
     });
-
     return next;
   }, [department, presetScopedEmployees, sortMode]);
 
@@ -202,10 +147,7 @@ export function EmployeesPage() {
   );
 
   useEffect(() => {
-    if (!selectedEmployee) {
-      return;
-    }
-
+    if (!selectedEmployee) return;
     setEditState({
       role: selectedEmployee.role,
       department: selectedEmployee.department,
@@ -219,8 +161,7 @@ export function EmployeesPage() {
   }, [selectedEmployee]);
 
   const stats = useMemo(() => {
-    const averagePerformance =
-      filteredEmployees.length > 0
+    const averagePerformance = filteredEmployees.length > 0
         ? Math.round(filteredEmployees.reduce((sum, employee) => sum + employee.performanceScore, 0) / filteredEmployees.length)
         : 0;
 
@@ -240,17 +181,12 @@ export function EmployeesPage() {
         const current = map.get(key) ?? { manager: key, count: 0, attention: 0, averagePerformance: 0 };
         current.count += 1;
         current.averagePerformance += employee.performanceScore;
-        if (getEmployeePriority(employee) !== "normal") {
-          current.attention += 1;
-        }
+        if (getEmployeePriority(employee) !== "normal") current.attention += 1;
         map.set(key, current);
         return map;
       }, new Map<string, { manager: string; count: number; attention: number; averagePerformance: number }>()).values(),
     )
-      .map((item) => ({
-        ...item,
-        averagePerformance: Math.round(item.averagePerformance / Math.max(item.count, 1)),
-      }))
+      .map((item) => ({ ...item, averagePerformance: Math.round(item.averagePerformance / Math.max(item.count, 1)) }))
       .sort((left, right) => right.count - left.count)
       .slice(0, 4);
   }, [presetScopedEmployees]);
@@ -261,69 +197,37 @@ export function EmployeesPage() {
       header: "Employee",
       render: (row) => (
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-[0.7rem] font-black text-brand-700">
             {getInitials(row.name)}
           </span>
-          <div>
-            <p className="font-bold text-slate-900">{row.name}</p>
-            <p className="text-xs text-slate-500">{row.email}</p>
+          <div className="min-w-0">
+            <p className="font-bold text-slate-900 truncate">{row.name}</p>
+            <p className="text-[0.65rem] text-slate-400 truncate">{row.email}</p>
           </div>
         </div>
       ),
     },
     {
       key: "assignment",
-      header: "Assignment",
+      header: "Role / Dept",
       render: (row) => (
         <div>
-          <p className="font-semibold text-slate-900">{row.role}</p>
-          <p className="text-xs text-slate-500">{row.department}</p>
+          <p className="font-bold text-slate-700 truncate">{row.role}</p>
+          <p className="text-[0.65rem] font-black uppercase text-slate-400">{row.department}</p>
         </div>
       ),
     },
-    {
-      key: "location",
-      header: "Location",
-      render: (row) => (
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-          <MapPin className="h-4 w-4 text-slate-400" />
-          {row.location}
-        </span>
-      ),
-    },
-    { key: "manager", header: "Manager", render: (row) => row.manager },
-    {
-      key: "tenure",
-      header: "Tenure",
-      render: (row) => (
-        <div>
-          <p className="font-semibold text-slate-900">{formatTenure(row.joinDate)}</p>
-          <p className="text-xs text-slate-500">Joined {formatDate(row.joinDate)}</p>
-        </div>
-      ),
-    },
+    { key: "manager", header: "Manager", render: (row) => <span className="font-bold text-slate-600">{row.manager}</span> },
     {
       key: "performance",
       header: "Performance",
       render: (row) => (
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="font-bold text-brand-700">{row.performanceScore}%</p>
-            {row.performanceScore >= 90 ? <Star className="h-4 w-4 text-amber-500" /> : null}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-black text-brand-700">{row.performanceScore}%</span>
+          <div className="h-1.5 w-12 rounded-full bg-slate-100 hidden sm:block overflow-hidden">
+            <div className="h-full bg-brand-600" style={{ width: `${row.performanceScore}%` }} />
           </div>
-          <div className="mt-1 h-1.5 w-20 rounded-full bg-brand-100">
-            <div className="h-full rounded-full bg-brand-600" style={{ width: `${row.performanceScore}%` }} />
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "avg-tos",
-      header: "Avg time on system",
-      render: (row) => (
-        <div>
-          <p className="font-semibold text-slate-900">{formatAverageTos(row.avgTimeOnSystemMinutes)}</p>
-          <p className="text-xs text-slate-500">Last 30 days avg</p>
+          {row.performanceScore >= 90 ? <Star className="h-3.5 w-3.5 text-amber-500 fill-current" /> : null}
         </div>
       ),
     },
@@ -332,8 +236,7 @@ export function EmployeesPage() {
       key: "actions",
       header: "Actions",
       render: (row) => (
-        <button type="button" onClick={() => setSelectedEmployeeId(row.id)} className="btn-secondary px-3 py-2">
-          <PencilLine className="h-4 w-4" />
+        <button type="button" onClick={() => setSelectedEmployeeId(row.id)} className="btn-secondary px-2.5 py-1.5 text-xs">
           Manage
         </button>
       ),
@@ -342,10 +245,7 @@ export function EmployeesPage() {
 
   const handleChange = (field: keyof NewEmployeePayload, value: string) => {
     const nextValue = field === "performanceScore" ? Number(value) : field === "shiftCode" ? value || null : value;
-    setFormState((current) => ({
-      ...current,
-      [field]: nextValue,
-    }));
+    setFormState((current) => ({ ...current, [field]: nextValue }));
   };
 
   const handleEditChange = (field: keyof UpdateEmployeePayload, value: string) => {
@@ -372,34 +272,26 @@ export function EmployeesPage() {
       shiftCode: DEFAULT_SHIFT_CODE,
     });
     setSubmitError(null);
-    setActionMessage("Starter template loaded into the add employee form.");
+    setActionMessage("Starter template loaded.");
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
     setSubmitError(null);
-    setActionMessage(null);
-
     if (!formState.shiftCode) {
-      setSubmitError("Select a shift before adding the employee.");
+      setSubmitError("Select a shift.");
       setSubmitting(false);
       return;
     }
-
     try {
-      const result = await hrService.createEmployee(formState);
+      await hrService.createEmployee(formState);
       setFormState(initialForm);
       await refetch();
-      if (result.invite.status === "sent") {
-        setActionMessage(`Employee profile created and login invite sent to ${result.employee.email}.`);
-      } else if (result.invite.status === "existing_user") {
-        setActionMessage(`Employee profile created. ${result.invite.message}`);
-      } else {
-        setActionMessage(`Employee profile created. Invite status: ${result.invite.message}`);
-      }
-    } catch (submitIssue) {
-      setSubmitError(submitIssue instanceof Error ? submitIssue.message : "Unable to add employee.");
+      setActionMessage(`Employee created.`);
+      setShowAddModal(false);
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "Failed to add employee.");
     } finally {
       setSubmitting(false);
     }
@@ -407,88 +299,44 @@ export function EmployeesPage() {
 
   const handleUpdate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!selectedEmployee) {
-      return;
-    }
-
+    if (!selectedEmployee) return;
     setUpdating(true);
-    setUpdateError(null);
-    setActionMessage(null);
-
     try {
       await hrService.updateEmployee(selectedEmployee.id, editState);
       await refetch();
-      setActionMessage("Employee profile updated.");
-    } catch (updateIssue) {
-      setUpdateError(updateIssue instanceof Error ? updateIssue.message : "Unable to update employee.");
+      setActionMessage("Updated.");
+    } catch {
+      // Ignore
     } finally {
       setUpdating(false);
     }
   };
 
   const handleQuickStatusAction = async (nextStatus: Employee["status"]) => {
-    if (!selectedEmployee) {
-      return;
-    }
-
+    if (!selectedEmployee) return;
     setActionLoading("status");
-    setUpdateError(null);
-    setActionMessage(null);
-
     try {
       await hrService.updateEmployee(selectedEmployee.id, { ...editState, status: nextStatus });
       await refetch();
-      setEditState((current) => ({ ...current, status: nextStatus }));
-      setActionMessage(`${selectedEmployee.name} moved to ${nextStatus.replaceAll("_", " ")}.`);
-    } catch (issue) {
-      setUpdateError(issue instanceof Error ? issue.message : "Unable to update employee status.");
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleArchive = async () => {
-    if (!selectedEmployee) {
-      return;
-    }
-
-    setActionLoading("archive");
-    setUpdateError(null);
-    setActionMessage(null);
-
-    try {
-      await hrService.archiveEmployee(selectedEmployee.id);
-      await refetch();
-      setActionMessage(`${selectedEmployee.name} archived as inactive.`);
-    } catch (issue) {
-      setUpdateError(issue instanceof Error ? issue.message : "Unable to archive employee.");
+      setEditState((c) => ({ ...c, status: nextStatus }));
+      setActionMessage(`Moved to ${nextStatus}.`);
+    } catch {
+      // Ignore
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleDelete = async () => {
-    if (!selectedEmployee) {
-      return;
-    }
-
-    const confirmed = window.confirm(`Delete ${selectedEmployee.name}? This can remove linked HR records.`);
-    if (!confirmed) {
-      return;
-    }
-
+    if (!selectedEmployee || !window.confirm(`Delete ${selectedEmployee.name}?`)) return;
     setActionLoading("delete");
-    setUpdateError(null);
-    setActionMessage(null);
-
     try {
       await hrService.deleteEmployee(selectedEmployee.id);
       setSelectedEmployeeId(null);
       await refetch();
-      setActionMessage("Employee deleted.");
-    } catch (issue) {
-      setUpdateError(issue instanceof Error ? issue.message : "Unable to delete employee.");
+      setActionMessage("Deleted.");
+    } catch {
+      // Ignore
     } finally {
       setActionLoading(null);
     }
@@ -500,342 +348,267 @@ export function EmployeesPage() {
     <div className="animate-page-enter space-y-6">
       <PageHeader
         title="Employees"
-        subtitle="Operate the directory like a real people console: filter, prioritize, assign ownership, and move employee records through their lifecycle without losing context."
-        eyebrow="People directory"
+        subtitle="Manage workforce and performance."
+        eyebrow="Talent"
         action={
-          <>
-            <button type="button" onClick={handleApplyStarterTemplate} className="btn-secondary">
-              <UserPlus className="h-4 w-4" />
-              Starter template
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setShowStats(!showStats)} className="btn-secondary" title="Toggle Signals">
+              {showStats ? <ChevronUp className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+              {showStats ? "Hide Signals" : "Show Signals"}
             </button>
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setDepartment("");
-                  setStatus("");
-                  setViewPreset("all");
-                  setManagerFocus("");
-                  setSortMode("recent");
-                }}
-                className="btn-secondary"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reset filters
-              </button>
-            ) : null}
-          </>
+            <button type="button" onClick={() => setShowAddModal(true)} className="btn-primary" title="Add New Employee">
+              <UserPlus className="h-4 w-4" />
+              Add Employee
+            </button>
+          </div>
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Visible people" value={String(stats.total)} hint="Current working set" icon={Users} />
-        <StatCard title="Active workforce" value={String(stats.active)} hint="Ready for allocation" icon={UserCheck} />
-        <StatCard title="Recent joiners" value={String(stats.recentJoiners)} hint="Joined in the last 45 days" icon={Clock3} />
-        <StatCard title="Attention queue" value={String(stats.attention)} hint="Low performance or lifecycle follow-up" icon={Activity} />
-      </div>
+      {showStats ? (
+        <div className="space-y-6">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard title="Headcount" value={String(stats.total)} hint="Visible working set" icon={Users} accent />
+            <StatCard title="Active" value={String(stats.active)} hint="Ready for allocation" icon={UserCheck} />
+            <StatCard title="Avg Score" value={`${stats.averagePerformance}%`} hint="Performance health" icon={Star} />
+            <StatCard title="Attention" value={String(stats.attention)} hint="Lifecycle follow-ups" icon={Activity} />
+          </div>
 
-      <SectionCard title="People command bar" subtitle="Layer saved views, ownership filters, and sorting without leaving the directory">
-        <div className="grid gap-3 xl:grid-cols-[1.25fr_0.8fr_0.8fr_0.8fr]">
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search employee, email, role, or manager"
-            className="input-surface"
-          />
-          <select value={department} onChange={(event) => setDepartment(event.target.value)} className="input-surface">
-            <option value="">All departments</option>
-            {departments.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
+          <SectionCard title="Manager Review Load" subtitle="Team distribution and focus areas">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              {managerInsights.map((m) => {
+                const active = managerFocus === m.manager;
+                const ratio = Math.round((m.attention / Math.max(m.count, 1)) * 100);
+                return (
+                  <button
+                    key={m.manager}
+                    type="button"
+                    onClick={() => setManagerFocus(active ? "" : m.manager)}
+                    className={`rounded-xl border p-4 text-left transition-all ${
+                      active ? "border-brand-300 bg-brand-50/50 ring-2 ring-brand-100" : "border-slate-100 bg-white hover:border-slate-300 shadow-sm"
+                    }`}
+                  >
+                    <p className="text-[0.6rem] font-black uppercase tracking-[0.14em] text-slate-400">{m.manager}</p>
+                    <p className="mt-2 text-2xl font-black text-slate-900">{m.count}</p>
+                    <div className="mt-3 flex items-center justify-between text-[0.65rem] font-bold text-slate-500">
+                      <span>{m.averagePerformance}% Score</span>
+                      <span className={ratio > 20 ? "text-amber-600" : ""}>{ratio}% Attention</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </SectionCard>
+        </div>
+      ) : null}
+
+      <div className="sticky top-[72px] z-10 -mx-4 px-4 py-2 bg-white/80 backdrop-blur-md border-b border-slate-200/60 mb-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search people, email, role..."
+              className="input-surface w-full pl-10 h-10"
+            />
+          </div>
+          <select value={department} onChange={(e) => setDepartment(e.target.value)} className="input-surface h-10 text-xs font-bold" title="Filter by Department">
+            <option value="">All Departments</option>
+            {departments.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className="input-surface">
-            <option value="">All statuses</option>
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="input-surface h-10 text-xs font-bold" title="Filter by Status">
+            <option value="">All Statuses</option>
             <option value="active">Active</option>
-            <option value="on_leave">On leave</option>
+            <option value="on_leave">On Leave</option>
             <option value="inactive">Inactive</option>
           </select>
-          <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="input-surface">
-            <option value="recent">Sort: most recent joins</option>
-            <option value="performance">Sort: highest performance</option>
-            <option value="name">Sort: name A-Z</option>
-            <option value="manager">Sort: manager</option>
+          <select value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)} className="input-surface h-10 text-xs font-bold" title="Sort order">
+            <option value="recent">Sort: Newest</option>
+            <option value="performance">Sort: Performance</option>
+            <option value="name">Sort: A-Z</option>
+            <option value="manager">Sort: Manager</option>
           </select>
+          {hasActiveFilters && (
+            <button onClick={() => { setSearch(""); setDepartment(""); setStatus(""); setViewPreset("all"); setManagerFocus(""); setSortMode("recent"); }} className="btn-secondary h-10 px-3" title="Reset Filters">
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          )}
         </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {[
-            { id: "all", label: "All people" },
-            { id: "high_performers", label: "High performers" },
-            { id: "attention", label: "Needs attention" },
-            { id: "new_joiners", label: "Recent joiners" },
-          ].map((preset) => (
+            { id: "all", label: "All People" },
+            { id: "high_performers", label: "High Performers" },
+            { id: "attention", label: "Needs Attention" },
+            { id: "new_joiners", label: "Recent Joiners" },
+          ].map((p) => (
             <button
-              key={preset.id}
-              type="button"
-              onClick={() => setViewPreset(preset.id as ViewPreset)}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                viewPreset === preset.id ? "bg-brand-900 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              key={p.id}
+              onClick={() => setViewPreset(p.id as ViewPreset)}
+              className={`rounded-full px-3 py-1 text-[0.65rem] font-black uppercase tracking-wider transition ${
+                viewPreset === p.id ? "bg-brand-700 text-white shadow-sm" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
               }`}
             >
-              {preset.label}
+              {p.label}
             </button>
           ))}
-          {managerFocus ? (
-            <span className="insight-pill">
-              <Filter className="h-3.5 w-3.5" />
-              Manager: {managerFocus}
-            </span>
-          ) : null}
         </div>
-      </SectionCard>
+      </div>
 
-      <SectionCard title="Manager coverage" subtitle="See who owns the largest teams and where review load is building">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {managerInsights.map((manager) => {
-            const active = managerFocus === manager.manager;
-            const attentionRatio = Math.round((manager.attention / Math.max(manager.count, 1)) * 100);
-
-            return (
-              <button
-                key={manager.manager}
-                type="button"
-                onClick={() => setManagerFocus(active ? "" : manager.manager)}
-                className={`rounded-xl border p-4 text-left transition ${
-                  active ? "border-brand-300 bg-brand-50" : "border-slate-200 bg-white hover:border-slate-300"
-                }`}
-              >
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{manager.manager}</p>
-                <p className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950">{manager.count}</p>
-                <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
-                  <span>{manager.averagePerformance}% avg score</span>
-                  <span>{attentionRatio}% attention</span>
-                </div>
-                <div className="mt-3 h-2 rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-brand-700" style={{ width: `${Math.max(attentionRatio, 8)}%` }} />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </SectionCard>
-
-      <div className="grid gap-4 xl:grid-cols-[1.55fr_0.95fr]">
-        <SectionCard
-          title="Employee list"
-          subtitle="Primary operating table with selected-row highlighting and attention cues"
-          rightSlot={<span className="insight-pill">{filteredEmployees.length} visible records</span>}
-        >
-          {loading ? <p className="text-sm font-semibold text-slate-600">Loading employees...</p> : null}
-          {error ? <p className="text-sm font-semibold text-rose-700">{error}</p> : null}
+      <div className={`grid gap-6 transition-all duration-300 ${selectedEmployeeId ? 'lg:grid-cols-[1fr_400px]' : 'grid-cols-1'}`}>
+        <SectionCard title="Employee Directory" rightSlot={<span className="insight-pill">{filteredEmployees.length} profiles</span>}>
+          {loading && <p className="text-sm font-bold text-brand-600">Syncing...</p>}
+          {actionMessage && <p className="mb-4 text-xs font-bold text-emerald-600 bg-emerald-50 p-2 rounded-lg">{actionMessage}</p>}
           <DataTable
             columns={columns}
             rows={filteredEmployees}
-            rowKey={(row) => row.id}
+            rowKey={(r) => r.id}
             exportFileName="employees"
-            emptyText="No employees match this filter."
-            rowClassName={(row) => {
-              if (row.id === selectedEmployeeId) {
-                return "!bg-brand-100/80";
-              }
-
-              return getEmployeePriority(row) === "high" ? "bg-amber-50/60" : "";
-            }}
+            rowClassName={(r) => r.id === selectedEmployeeId ? "!bg-brand-50/80 ring-1 ring-brand-200 ring-inset" : ""}
           />
         </SectionCard>
 
-        <div className="space-y-4">
-          <SectionCard
-            title="Add employee"
-            subtitle="Create a profile with a reusable onboarding template"
-            rightSlot={
-              <button type="button" onClick={handleApplyStarterTemplate} className="btn-secondary px-3 py-2">
-                <Plus className="h-4 w-4" />
-                Prefill
-              </button>
-            }
-          >
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <input required value={formState.name} onChange={(event) => handleChange("name", event.target.value)} placeholder="Full name" className="input-surface w-full" />
-              <input required type="email" value={formState.email} onChange={(event) => handleChange("email", event.target.value)} placeholder="Email" className="input-surface w-full" />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input required value={formState.role} onChange={(event) => handleChange("role", event.target.value)} placeholder="Role" className="input-surface w-full" />
-                <input required value={formState.department} onChange={(event) => handleChange("department", event.target.value)} placeholder="Department" className="input-surface w-full" />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input required value={formState.location} onChange={(event) => handleChange("location", event.target.value)} placeholder="Location" className="input-surface w-full" />
-                <input required value={formState.manager} onChange={(event) => handleChange("manager", event.target.value)} placeholder="Manager" className="input-surface w-full" />
-              </div>
-              <input required type="date" value={formState.joinDate} onChange={(event) => handleChange("joinDate", event.target.value)} className="input-surface w-full" />
-              <select required value={formState.shiftCode ?? ""} onChange={(event) => handleChange("shiftCode", event.target.value)} className="input-surface w-full">
-                <option value="">Select shift</option>
-                {SHIFT_DEFINITIONS.map((shift) => (
-                  <option key={shift.code} value={shift.code}>
-                    {shift.label}
-                  </option>
-                ))}
-              </select>
-              <select value={formState.status} onChange={(event) => handleChange("status", event.target.value)} className="input-surface w-full">
-                <option value="active">Active</option>
-                <option value="on_leave">On leave</option>
-                <option value="inactive">Inactive</option>
-              </select>
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Performance score</label>
-                <input type="range" min={0} max={100} value={formState.performanceScore} onChange={(event) => handleChange("performanceScore", event.target.value)} className="w-full accent-brand-700" />
-                <p className="text-xs font-semibold text-slate-600">{formState.performanceScore}%</p>
-              </div>
-
-              {submitError ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{submitError}</p> : null}
-              {actionMessage && !selectedEmployee ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">{actionMessage}</p> : null}
-              <button type="submit" disabled={submitting} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-70">
-                <Plus className="h-4 w-4" />
-                {submitting ? "Adding..." : "Add employee"}
-              </button>
-            </form>
-          </SectionCard>
-
-          <SectionCard title="Manage employee" subtitle="Act on role, assignment, lifecycle, and performance from one panel">
-            {selectedEmployee ? (
-              <form onSubmit={handleUpdate} className="space-y-4">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-base font-semibold text-slate-950">{selectedEmployee.name}</p>
-                      <p className="mt-1 text-sm text-slate-600">{selectedEmployee.email}</p>
-                    </div>
-                    <StatusBadge value={selectedEmployee.status} />
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
-                      <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Location</p>
-                      <p className="mt-2 text-sm font-semibold text-slate-950">{selectedEmployee.location}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
-                      <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Manager</p>
-                      <p className="mt-2 text-sm font-semibold text-slate-950">{selectedEmployee.manager}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
-                      <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Tenure</p>
-                      <p className="mt-2 text-sm font-semibold text-slate-950">{formatTenure(selectedEmployee.joinDate)}</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
-                      <p className="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-500">Shift</p>
-                      <p className="mt-2 text-sm font-semibold text-slate-950">
-                        {formatShiftLabel(selectedEmployee.shiftCode ?? DEFAULT_SHIFT_CODE)}
-                      </p>
-                      <div className="mt-2">
-                        <StatusBadge value={selectedEmployee.shiftApprovalStatus ?? DEFAULT_SHIFT_APPROVAL_STATUS} />
-                      </div>
-                    </div>
-                  </div>
+        {selectedEmployee && (
+          <aside className="lg:sticky lg:top-40 h-fit space-y-6 animate-page-enter">
+            <SectionCard 
+              title="Profile Editor" 
+              rightSlot={
+                <button onClick={() => setSelectedEmployeeId(null)} className="p-1 hover:bg-slate-100 rounded-lg transition" title="Close editor">
+                  <X className="h-5 w-5 text-slate-400" />
+                </button>
+              }
+            >
+              <form onSubmit={handleUpdate} className="space-y-5">
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                   <span className="h-12 w-12 flex items-center justify-center rounded-full bg-white border border-slate-200 text-sm font-black text-brand-700 shadow-sm">
+                      {getInitials(selectedEmployee.name)}
+                   </span>
+                   <div className="min-w-0">
+                      <p className="font-black text-slate-900 truncate">{selectedEmployee.name}</p>
+                      <p className="text-xs font-bold text-slate-500 truncate">{selectedEmployee.email}</p>
+                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Quick lifecycle action</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {([
-                      { value: "active", label: "Active" },
-                      { value: "on_leave", label: "On leave" },
-                      { value: "inactive", label: "Inactive" },
-                    ] as Array<{ value: Employee["status"]; label: string }>).map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => void handleQuickStatusAction(item.value)}
-                        disabled={actionLoading !== null}
-                        className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                          editState.status === item.value
-                            ? "border-brand-300 bg-brand-50 text-brand-800"
-                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                        } disabled:cursor-not-allowed disabled:opacity-70`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
+                <div className="grid grid-cols-3 gap-2">
+                  {(["active", "on_leave", "inactive"] as Employee["status"][]).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => void handleQuickStatusAction(s)}
+                      disabled={actionLoading !== null}
+                      className={`rounded-lg border py-2 text-[0.65rem] font-black uppercase tracking-widest transition ${
+                        editState.status === s ? "border-brand-600 bg-brand-50 text-brand-700 shadow-sm" : "border-slate-200 bg-white text-slate-400 hover:bg-slate-50"
+                      }`}
+                    >
+                      {s.replace("_", " ")}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-[0.6rem] font-black uppercase tracking-widest text-slate-400 ml-1">Role</label>
+                    <input value={editState.role} onChange={(e) => handleEditChange("role", e.target.value)} className="input-surface w-full h-9" placeholder="Role" title="Role" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[0.6rem] font-black uppercase tracking-widest text-slate-400 ml-1">Dept</label>
+                    <input value={editState.department} onChange={(e) => handleEditChange("department", e.target.value)} className="input-surface w-full h-9" placeholder="Department" title="Department" />
                   </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <input value={editState.role} onChange={(event) => handleEditChange("role", event.target.value)} placeholder="Role" className="input-surface w-full" />
-                  <input value={editState.department} onChange={(event) => handleEditChange("department", event.target.value)} placeholder="Department" className="input-surface w-full" />
-                  <input value={editState.location} onChange={(event) => handleEditChange("location", event.target.value)} placeholder="Location" className="input-surface w-full" />
-                  <input value={editState.manager} onChange={(event) => handleEditChange("manager", event.target.value)} placeholder="Manager" className="input-surface w-full" />
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Shift</label>
-                    <select value={editState.shiftCode ?? ""} onChange={(event) => handleEditChange("shiftCode", event.target.value)} className="input-surface w-full">
-                      {SHIFT_DEFINITIONS.map((shift) => (
-                        <option key={shift.code} value={shift.code}>
-                          {shift.label}
-                        </option>
-                      ))}
+                   <div className="space-y-1">
+                    <label className="text-[0.6rem] font-black uppercase tracking-widest text-slate-400 ml-1">Shift</label>
+                    <select value={editState.shiftCode ?? ""} onChange={(e) => handleEditChange("shiftCode", e.target.value)} className="input-surface w-full h-9 px-2" title="Select Shift">
+                      {SHIFT_DEFINITIONS.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Shift approval</label>
-                    <select
-                      value={editState.shiftApprovalStatus}
-                      onChange={(event) => handleEditChange("shiftApprovalStatus", event.target.value)}
-                      className="input-surface w-full"
-                    >
-                      <option value="pending">Pending approval</option>
+                  <div className="space-y-1">
+                    <label className="text-[0.6rem] font-black uppercase tracking-widest text-slate-400 ml-1">Approval</label>
+                    <select value={editState.shiftApprovalStatus} onChange={(e) => handleEditChange("shiftApprovalStatus", e.target.value)} className="input-surface w-full h-9 px-2" title="Shift Approval">
+                      <option value="pending">Pending</option>
                       <option value="approved">Approved</option>
                     </select>
                   </div>
                 </div>
-                <p className="text-xs font-medium text-slate-500">
-                  Office attendance is marked from the approved shift start time for this employee.
-                </p>
 
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Performance score</label>
-                  <input type="range" min={0} max={100} value={editState.performanceScore} onChange={(event) => handleEditChange("performanceScore", event.target.value)} className="w-full accent-brand-700" />
-                  <p className="text-xs font-semibold text-slate-600">{editState.performanceScore}%</p>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[0.6rem] font-black uppercase tracking-widest text-slate-400 ml-1">Performance</label>
+                    <span className="text-xs font-black text-brand-700">{editState.performanceScore}%</span>
+                  </div>
+                  <input type="range" min={0} max={100} value={editState.performanceScore} onChange={(e) => handleEditChange("performanceScore", e.target.value)} className="w-full accent-brand-600" title="Score range" />
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-950">
-                    <Briefcase className="h-4 w-4 text-brand-700" />
-                    Recommended next step
-                  </p>
-                  <p className="mt-2 text-sm text-slate-600">{getRecommendation(selectedEmployee)}</p>
+                <div className="p-3 rounded-xl bg-brand-50/50 border border-brand-100 flex gap-3">
+                  <Briefcase className="h-4 w-4 text-brand-600 shrink-0 mt-0.5" />
+                  <p className="text-[0.7rem] font-bold text-brand-800 leading-relaxed">{getRecommendation(selectedEmployee)}</p>
                 </div>
 
-                {updateError ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{updateError}</p> : null}
-                {actionMessage ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">{actionMessage}</p> : null}
-
-                <button type="submit" disabled={updating} className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-70">
-                  <PencilLine className="h-4 w-4" />
-                  {updating ? "Saving..." : "Save changes"}
-                </button>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button type="button" onClick={() => void handleArchive()} disabled={actionLoading !== null} className="btn-secondary w-full border-amber-200 text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-70">
-                    <Archive className="h-4 w-4" />
-                    {actionLoading === "archive" ? "Archiving..." : "Archive employee"}
+                <div className="flex flex-col gap-2">
+                  <button type="submit" disabled={updating} className="btn-primary w-full h-10">
+                    <PencilLine className="h-4 w-4" />
+                    {updating ? "Saving..." : "Save Profile"}
                   </button>
-                  <button type="button" onClick={() => void handleDelete()} disabled={actionLoading !== null} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-70">
+                  <button type="button" onClick={() => void handleDelete()} disabled={actionLoading !== null} className="btn-secondary w-full h-10 border-rose-100 text-rose-600 hover:bg-rose-50 hover:border-rose-200">
                     <Trash2 className="h-4 w-4" />
-                    {actionLoading === "delete" ? "Deleting..." : "Delete employee"}
+                    Delete Record
                   </button>
                 </div>
               </form>
-            ) : (
-              <p className="text-sm font-medium text-slate-600">Choose an employee from the table to edit their assignment, change lifecycle state, or remove the record.</p>
-            )}
-          </SectionCard>
-
-        </div>
+            </SectionCard>
+          </aside>
+        )}
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-page-enter">
+          <div className="w-full max-w-xl bg-white rounded-[32px] shadow-panel overflow-hidden border border-slate-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Onboard New Talent</h2>
+                <p className="text-xs font-bold text-slate-500 mt-1">Create a system profile and send access credentials.</p>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white rounded-full transition shadow-sm border border-slate-200" title="Close onboarder">
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <input required value={formState.name} onChange={(e) => handleChange("name", e.target.value)} placeholder="Full Name" className="input-surface w-full" />
+                <input required type="email" value={formState.email} onChange={(e) => handleChange("email", e.target.value)} placeholder="Email Address" className="input-surface w-full" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <input required value={formState.role} onChange={(e) => handleChange("role", e.target.value)} placeholder="Job Role" className="input-surface w-full" />
+                <input required value={formState.department} onChange={(e) => handleChange("department", e.target.value)} placeholder="Department" className="input-surface w-full" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <input required value={formState.location} onChange={(e) => handleChange("location", e.target.value)} placeholder="Location (e.g. Remote)" className="input-surface w-full" />
+                <input required value={formState.manager} onChange={(e) => handleChange("manager", e.target.value)} placeholder="Reporting Manager" className="input-surface w-full" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <input required type="date" value={formState.joinDate} onChange={(e) => handleChange("joinDate", e.target.value)} className="input-surface w-full" title="Join Date" />
+                <select required value={formState.shiftCode ?? ""} onChange={(e) => handleChange("shiftCode", e.target.value)} className="input-surface w-full" title="Shift Code">
+                  <option value="">Select Shift</option>
+                  {SHIFT_DEFINITIONS.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
+                </select>
+              </div>
+
+              {submitError && <p className="p-3 rounded-xl bg-rose-50 text-rose-600 text-xs font-bold">{submitError}</p>}
+              
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={handleApplyStarterTemplate} className="btn-secondary flex-1">
+                  Use Template
+                </button>
+                <button type="submit" disabled={submitting} className="btn-primary flex-[2] h-11">
+                  {submitting ? "Processing..." : "Confirm Onboarding"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

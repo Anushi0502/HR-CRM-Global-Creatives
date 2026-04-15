@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { DataTable } from "../components/DataTable";
 import type { TableColumn } from "../components/DataTable";
-import { ModuleHero } from "../components/ModuleHero";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
 import { StatCard } from "../components/StatCard";
@@ -821,14 +820,6 @@ export function PayrollPage() {
             ) : null}
           </>
         }
-      />
-
-      <ModuleHero
-        icon={Wallet}
-        title="Payroll processing with smarter cycle control"
-        subtitle="The register now supports month filtering, saved queue modes, export, next-cycle duplication, and draft autofill from the latest employee payroll history."
-        chips={["Cycle control", "Queue review", "Draft autofill"]}
-        spotlight={filteredRecords.length > 0 ? `${formatCurrency(summary.scheduledExposure)} scheduled exposure` : "Payroll workspace"}
       />
 
       {actionMessage ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{actionMessage}</p> : null}

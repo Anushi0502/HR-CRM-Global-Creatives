@@ -236,6 +236,12 @@ export function AppLayout({ onSignOut, items, workspaceLabel, userRole }: AppLay
     }
   };
 
+  useEffect(() => {
+    if (userRole === "admin") {
+      void hrService.autoCheckoutStaleSessions();
+    }
+  }, [userRole]);
+
   return (
     <div className="min-h-screen bg-transparent">
       <div className="flex min-h-screen">

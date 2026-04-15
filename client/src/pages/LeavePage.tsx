@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarClock, CircleCheckBig, CircleDashed, CircleX, Copy, Flag } from "lucide-react";
 import { DataTable } from "../components/DataTable";
 import type { TableColumn } from "../components/DataTable";
-import { ModuleHero } from "../components/ModuleHero";
 import { PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
 import { StatCard } from "../components/StatCard";
@@ -223,14 +222,6 @@ export function LeavePage() {
         title="Leave Management"
         subtitle="Approve, reject, and monitor leave requests across every department"
         eyebrow="Leave Workflow"
-      />
-
-      <ModuleHero
-        icon={CalendarClock}
-        title="Approve Faster While Protecting Team Coverage"
-        subtitle="Use policy guardrails and request analytics to reduce leave bottlenecks and avoid staffing risk."
-        chips={["Approval workflow", "Coverage safety", "24h response target"]}
-        spotlight={`${stats.pending} Pending Approvals`}
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

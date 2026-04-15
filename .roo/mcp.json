@@ -1,0 +1,17 @@
+{
+	"mcpServers": {
+		"supabase": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@supabase/mcp-server-supabase@0.5.5",
+				"--access-token",
+				"sbp_ab9df8690936c85e8564db316fd75913ddfe41d5"
+			],
+			"alwaysAllow": [
+				"execute_sql",
+				"list_tables"
+			]
+		}
+	}
+}
