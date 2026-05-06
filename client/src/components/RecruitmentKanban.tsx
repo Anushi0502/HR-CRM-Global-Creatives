@@ -10,10 +10,6 @@ interface RecruitmentKanbanProps {
   updatingCandidateId?: string | null;
 }
 
-function toStageLabel(stage: CandidateStage): string {
-  return stage.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
 export function RecruitmentKanban({ candidates, stages, onStageChange, updatingCandidateId }: RecruitmentKanbanProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
