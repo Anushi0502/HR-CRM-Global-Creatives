@@ -63,10 +63,9 @@ export function RecruitmentKanban({ candidates, stages, onStageChange, updatingC
           >
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-500">{toStageLabel(stage)}</p>
-                <p className="text-sm font-semibold text-brand-700">{list.length} candidates</p>
-              </div>
               <StatusBadge value={stage} />
+              <p className="text-sm font-semibold text-brand-700">{list.length} candidates</p>
+              </div>
             </div>
 
             <div className="space-y-3">
