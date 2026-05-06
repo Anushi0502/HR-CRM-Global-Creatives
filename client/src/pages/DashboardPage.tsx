@@ -117,7 +117,7 @@ export function DashboardPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Priority Queue" subtitle="Actionable items requiring leadership review">
+        <SectionCard title="Priority Queue" subtitle="Actionable items requiring leadership review" collapsible>
           <div className="space-y-3">
             {command.priorityItems.map((item) => (
               <Link key={item.id} to={item.route} className={`flex items-center justify-between p-3.5 rounded-xl border transition-all hover:scale-[1.02] active:scale-[0.98] ${priorityTone[item.tone] || priorityTone.info}`}>

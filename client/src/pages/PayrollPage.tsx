@@ -343,11 +343,6 @@ export function PayrollPage() {
   const hasActiveFilters = Boolean(search || department || monthFilter || statusFilter || focusMode !== "all");
   const allVisibleSelected = filteredRecords.length > 0 && selectedIds.length === filteredRecords.length;
 
-  const scheduledQueue = useMemo(
-    () => filteredRecords.filter((record) => record.status === "scheduled").sort((left, right) => right.netPay - left.netPay).slice(0, 5),
-    [filteredRecords],
-  );
-
   const toggleSelection = (id: string) => {
     setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
   };
@@ -940,8 +935,6 @@ export function PayrollPage() {
                 Clear adjustments
               </button>
             }
-            collapsible
-            defaultCollapsed
           >
             <form onSubmit={handleCreatePayroll} className="space-y-3">
               <select value={formState.employeeId ?? ""} onChange={(event) => handleEmployeeSelect(event.target.value)} className="input-surface w-full">
@@ -978,30 +971,6 @@ export function PayrollPage() {
                 {submitting ? "Creating..." : "Create payroll record"}
               </button>
             </form>
-          </SectionCard>
-
-          <SectionCard title="Processing queue" subtitle="Scheduled payouts with the highest immediate exposure">
-            {scheduledQueue.length > 0 ? (
-              <div className="space-y-3">
-                {scheduledQueue.map((record) => (
-                  <div key={record.id} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-950">{record.employeeName}</p>
-                        <p className="mt-1 text-sm text-slate-600">{record.department} · {formatMonthLabel(record.month)}</p>
-                      </div>
-                      <StatusBadge value={record.status} />
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-sm text-slate-600">
-                      <span>Net pay</span>
-                      <span className="font-semibold text-slate-950">{formatCurrency(record.netPay)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm font-medium text-slate-600">No scheduled payouts in the current view.</p>
-            )}
           </SectionCard>
         </div>
       </div>
